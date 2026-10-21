@@ -1,4 +1,6 @@
 {
-  "version": 2,
-  "ghi_chu": "Phát hành phiên bản đầu tiên tích hợp tự động cập nhật và phân tích Tafel."
+  "phien_ban_hien_tai": 2,
+  "ten_ung_dung": "Echem Studio",
+  "link_tai_zip": "https://github.com/caothanhloc03-byte/xu-ly-dien-hoa/archive/refs/heads/main.zip",
+  "ghi_chu": "Bản vá lỗi tính Tafel và cập nhật vẽ chèn EIS."
 }
