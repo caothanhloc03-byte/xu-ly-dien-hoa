@@ -1,6 +1,6 @@
 {
-  "phien_ban_hien_tai": 2,
+  "phien_ban_hien_tai": 3,
   "ten_ung_dung": "Echem Studio",
   "link_tai_zip": "https://github.com/caothanhloc03-byte/xu-ly-dien-hoa/archive/refs/heads/main.zip",
-  "ghi_chu": "Bản vá lỗi tính Tafel và cập nhật vẽ chèn EIS."
+  "ghi_chu": "Sửa chuẩn hóa xử lý dữ liệu và chiều đồ thị EIS."
 }
