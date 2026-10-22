@@ -43,15 +43,25 @@ def doc_file_tho(duong_dan):
     if dong and dong[0].startswith("CSStudioFile"):
         p = dong[0].split(",")
         nhan = p[1] if len(p) > 1 else ""
+    
+    # Kiểm tra xem đây có phải là file dữ liệu EIS (.z60) hay không dựa vào từ khóa
+    la_file_eis = any("Freq (Hz)" in d or "Z'(Ohm" in d for d in dong)
+    
     du_lieu = []
     for d in dong:
         phan = d.replace(",", "\t").split()
-        if len(phan) < 3:
+        if not phan:
             continue
         try:
-            du_lieu.append([float(x) for x in phan[:3]])
+            if la_file_eis and len(phan) >= 6:
+                # Đối với file EIS: lấy Freq (cột 0), Z' (cột 4), -Z'' (cột 5)
+                du_lieu.append([float(phan[0]), float(phan[4]), float(phan[5])])
+            elif not la_file_eis and len(phan) >= 3:
+                # Đối với các file CV, LSV, IT thông thường
+                du_lieu.append([float(x) for x in phan[:3]])
         except ValueError:
             continue
+            
     if not du_lieu:
         raise ValueError(f"Không đọc được số liệu trong {duong_dan}")
     return pd.DataFrame(du_lieu, columns=["c1", "c2", "c3"]), nhan
@@ -231,9 +241,15 @@ def duong_it(muc, noi_tiep=False):
 # ====================== EIS ======================
 def xu_ly_eis(df):
     f, zr, zi = df["c1"].to_numpy(), df["c2"].to_numpy(), df["c3"].to_numpy()
-    d = pd.DataFrame({"f (Hz)": f, "Z' (ohm)": zr, "-Z'' (ohm)": -zi})
+    
+    d = pd.DataFrame({
+        "f (Hz)": f, 
+        "Z' (ohm)": zr, 
+        "-Z'' (ohm)": -zi  
+    })
+    
     d["|Z| (ohm)"] = np.hypot(zr, zi)
-    d["pha (do)"] = np.degrees(np.arctan2(-zi, zr))
+    d["pha (do)"] = np.degrees(np.arctan2(zi, zr)) 
     return d.sort_values("f (Hz)", ascending=False).reset_index(drop=True)
 
 

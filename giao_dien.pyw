@@ -12,8 +12,19 @@ import threading
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, scrolledtext, simpledialog, ttk
 
-THU_MUC = os.path.dirname(os.path.abspath(__file__))
-CAI_DAT = os.path.join(THU_MUC, "cai_dat.json")
+FROZEN = getattr(sys, "frozen", False)
+THU_MUC = os.path.dirname(os.path.abspath(__file__))   # thư mục chứa mã nguồn (ma_nguon khi chạy bằng exe)
+DATA_DIR = os.path.join(os.environ.get("APPDATA", THU_MUC), "DienHoaOrigin")
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+except Exception:
+    DATA_DIR = THU_MUC
+CAI_DAT = os.path.join(DATA_DIR, "cai_dat.json")
+try:
+    import tu_dong_cap_nhat as cn
+except Exception:
+    cn = None
+THU_MUC_RA_MD = os.path.join(os.path.expanduser("~"), "Documents", "DienHoa_KetQua")
 PHIEN_BAN_CAI_DAT = 3
 LOAI = ["Tự nhận dạng", "LSV", "CV", "IT", "EIS", "ECSA (nhiều file CV)", "Tafel"]
 BANG_MAU = ["#404040", "#f03c3c", "#1a5fd8", "#2aa55a", "#ff7f0e", "#9467bd",
@@ -33,7 +44,8 @@ def python_exe():
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("Xử lý và vẽ số liệu điện hóa  (LSV · CV · IT · EIS · ECSA · Tafel)")
+        self.phien_ban = cn.doc_phien_ban_cuc_bo(THU_MUC) if cn else 0
+        root.title(f"Xử lý và vẽ số liệu điện hóa  (LSV · CV · IT · EIS · ECSA · Tafel)  -  phiên bản {self.phien_ban}")
         root.minsize(960, 750)
         cd = self.doc_cai_dat()
 
@@ -59,7 +71,7 @@ class App:
         self.dung_origin = B(value=cd.get("dung_origin", True))
         self.dung_csv = B(value=cd.get("dung_csv", True))
         self.template = S(value=cd.get("template", ""))
-        self.thu_muc_ra = S(value=cd.get("thu_muc_ra", os.path.join(THU_MUC, "ket_qua")))
+        self.thu_muc_ra = S(value=cd.get("thu_muc_ra", THU_MUC_RA_MD))
         self.rong = S(value=cd.get("rong", "1200"))
         self.co_chu = S(value=cd.get("co_chu", "22"))
         self.day_net = S(value=cd.get("day_net", "2"))
@@ -68,6 +80,8 @@ class App:
         self.dung_giao_dien()
         self.cap_nhat_trang_thai()
         self.doc_hang_doi()
+        if cn:
+            self.root.after(1500, lambda: self.kiem_tra_cap_nhat(im_lang=True))
 
     def dung_giao_dien(self):
         pad = {"padx": 8, "pady": 4}
@@ -167,6 +181,7 @@ class App:
         self.nut_chay = ttk.Button(fb, text="▶  CHẠY XỬ LÝ & VẼ", command=self.bam_chay)
         self.nut_chay.pack(side="left", ipadx=28, ipady=6)
         ttk.Button(fb, text="Mở thư mục kết quả", command=self.mo_thu_muc).pack(side="left", padx=10)
+        ttk.Button(fb, text="Kiểm tra cập nhật", command=lambda: self.kiem_tra_cap_nhat(False)).pack(side="left")
 
         fl = ttk.LabelFrame(main, text=" Báo cáo & Thông số tính toán ")
         fl.pack(fill="both", expand=True, **pad)
@@ -301,6 +316,12 @@ class App:
             raise ValueError(f"'{ten}' phải lớn hơn 0.")
         return v
 
+    @staticmethod
+    def lenh_con(ten_script, mode):
+        if FROZEN:
+            return [sys.executable, mode]
+        return [python_exe(), "-u", os.path.join(THU_MUC, ten_script)]
+
     def lam_lenh(self):
         if not self.muc:
             raise ValueError("Chưa chọn file số liệu nào.")
@@ -337,16 +358,15 @@ class App:
         for m in self.muc:
             nhan_mau += ["--nhan", m["nhan"], "--mau-file", m["mau"]]
 
-        py = python_exe()
         lenh = []
         if self.dung_origin.get():
-            c = [py, "-u", os.path.join(THU_MUC, "ve_origin.py")] + files + chung + nhan_mau
+            c = self.lenh_con("ve_origin.py", "--worker-origin") + files + chung + nhan_mau
             c += ["--thu-muc-ra", thu_muc, "--co-chu", str(self.so(self.co_chu, "Cỡ chữ", int, duong=True)),
                   "--day-net", str(self.so(self.day_net, "Dày nét", duong=True)),
                   "--ti-le", str(self.so(self.ti_le, "Tỉ lệ", duong=True))]
             lenh.append(("Vẽ bằng Origin 2024", c))
         if self.dung_csv.get():
-            c = [py, "-u", os.path.join(THU_MUC, "xu_ly_dien_hoa.py")] + files + chung + nhan_mau
+            c = self.lenh_con("xu_ly_dien_hoa.py", "--worker-csv") + files + chung + nhan_mau
             c += ["--thu-muc-ra", os.path.join(thu_muc, "csv_va_anh_nhanh")]
             lenh.append(("Xuất CSV & Ảnh nhanh", c))
         return lenh
@@ -388,11 +408,60 @@ class App:
         self.q.put(">>> HOÀN THÀNH\n" if tot else ">>> CÓ LỖI XẢY RA\n")
         self.q.put(None)
 
+    # ---------------- Cập nhật tự động ----------------
+    def kiem_tra_cap_nhat(self, im_lang=False):
+        if cn is None:
+            if not im_lang:
+                messagebox.showwarning("Cập nhật", "Không tìm thấy tu_dong_cap_nhat.py")
+            return
+        if self.dang_chay:
+            return
+
+        def nen():
+            co, tt, loi = cn.kiem_tra_cap_nhat(thu_muc=THU_MUC)
+            self.q.put(("kiem_tra", im_lang, co, tt, loi))
+        threading.Thread(target=nen, daemon=True).start()
+
+    def bat_dau_cap_nhat(self, tt):
+        self.dang_chay = True
+        self.nut_chay.config(state="disabled", text="Đang cập nhật...")
+
+        def nen():
+            ok, msg = cn.cap_nhat(tt, thu_muc=THU_MUC, log=lambda d: self.q.put(d + "\n"))
+            self.q.put(("xong_cap_nhat", ok, msg))
+        threading.Thread(target=nen, daemon=True).start()
+
+    def xu_ly_ui(self, m):
+        if m[0] == "kiem_tra":
+            _, im_lang, co, tt, loi = m
+            if loi:
+                if not im_lang:
+                    messagebox.showwarning("Cập nhật", loi)
+            elif co:
+                ghi_chu = tt.get("ghi_chu", "")
+                if messagebox.askyesno("Có bản cập nhật mới",
+                                       f"Phiên bản mới: {tt.get('phien_ban_hien_tai')} (hiện tại: {self.phien_ban})\n\n"
+                                       f"{ghi_chu}\n\nCập nhật ngay?"):
+                    self.bat_dau_cap_nhat(tt)
+            elif not im_lang:
+                messagebox.showinfo("Cập nhật", "Bạn đang dùng phiên bản mới nhất.")
+        elif m[0] == "xong_cap_nhat":
+            _, ok, msg = m
+            self.dang_chay = False
+            self.nut_chay.config(state="normal", text="▶  CHẠY XỬ LÝ & VẼ")
+            if ok:
+                messagebox.showinfo("Cập nhật", "Cập nhật thành công!\nPhần mềm sẽ đóng lại, hãy mở lại để dùng bản mới.")
+                self.root.destroy()
+            else:
+                messagebox.showerror("Cập nhật", msg)
+
     def doc_hang_doi(self):
         try:
             while True:
                 m = self.q.get_nowait()
-                if m is None:
+                if isinstance(m, tuple):
+                    self.xu_ly_ui(m)
+                elif m is None:
                     self.dang_chay = False
                     self.nut_chay.config(state="normal", text="▶  CHẠY XỬ LÝ & VẼ")
                 else:
@@ -406,7 +475,31 @@ class App:
 
 
 def main():
+    # Che do worker: exe tu goi lai chinh no de xu ly / ve
+    if len(sys.argv) > 1 and sys.argv[1] in ("--worker-origin", "--worker-csv"):
+        mode = sys.argv.pop(1)
+        if mode == "--worker-origin":
+            import ve_origin as m
+        else:
+            import xu_ly_dien_hoa as m
+        m.main()
+        return
+
+    # Che do giao dien: an cua so console den
+    if FROZEN and os.name == "nt":
+        try:
+            import ctypes
+            h = ctypes.windll.kernel32.GetConsoleWindow()
+            if h:
+                ctypes.windll.user32.ShowWindow(h, 0)
+        except Exception:
+            pass
+
     root = tk.Tk()
+    try:
+        root.iconbitmap(os.path.join(THU_MUC, "logo.ico"))
+    except Exception:
+        pass
     App(root)
     root.mainloop()
 
