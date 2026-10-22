@@ -76,6 +76,8 @@ class App:
         self.co_chu = S(value=cd.get("co_chu", "22"))
         self.day_net = S(value=cd.get("day_net", "2"))
         self.ti_le = S(value=cd.get("ti_le", "1.28"))
+        self.day_khung = S(value=cd.get("day_khung", "3"))
+        self.le_max = S(value=cd.get("le_max", "0.5"))
 
         self.dung_giao_dien()
         self.cap_nhat_trang_thai()
@@ -168,10 +170,12 @@ class App:
 
         sub = ttk.Frame(f3)
         sub.grid(row=4, column=0, columnspan=3, sticky="w", padx=8, pady=(8, 4))
-        for c, (nhan, bien, rong) in enumerate([("Cỡ chữ", self.co_chu, 4), ("Dày nét", self.day_net, 4),
-                                                ("Tỉ lệ R:C", self.ti_le, 5)]):
-            ttk.Label(sub, text=nhan).grid(row=0, column=c * 2, sticky="e", padx=(0, 2))
-            ttk.Entry(sub, textvariable=bien, width=rong).grid(row=0, column=c * 2 + 1, padx=(0, 6))
+        hang_o = [[("Cỡ chữ", self.co_chu, 4), ("Dày nét", self.day_net, 4), ("Tỉ lệ R:C", self.ti_le, 5)],
+                  [("Dày khung", self.day_khung, 4), ("Đệm trục (bước)", self.le_max, 4)]]
+        for r, cac in enumerate(hang_o):
+            for c, (nhan, bien, rong) in enumerate(cac):
+                ttk.Label(sub, text=nhan).grid(row=r, column=c * 2, sticky="e", padx=(0, 2), pady=1)
+                ttk.Entry(sub, textvariable=bien, width=rong).grid(row=r, column=c * 2 + 1, padx=(0, 6), pady=1)
 
         f3.columnconfigure(1, weight=1)
 
@@ -298,7 +302,7 @@ class App:
         cd = {"ver": PHIEN_BAN_CAI_DAT}
         for ten in ("loai", "chong", "noi_tiep", "mau_chu_ky", "chu_ky", "ph", "eref", "nhan_i", "chia_i",
                     "e_ecsa", "cs", "tafel_min", "tafel_max", "dung_origin", "dung_csv", "template",
-                    "thu_muc_ra", "rong", "co_chu", "day_net", "ti_le"):
+                    "thu_muc_ra", "rong", "co_chu", "day_net", "ti_le", "day_khung", "le_max"):
             cd[ten] = getattr(self, ten).get()
         try:
             with open(CAI_DAT, "w", encoding="utf-8") as f:
@@ -363,7 +367,9 @@ class App:
             c = self.lenh_con("ve_origin.py", "--worker-origin") + files + chung + nhan_mau
             c += ["--thu-muc-ra", thu_muc, "--co-chu", str(self.so(self.co_chu, "Cỡ chữ", int, duong=True)),
                   "--day-net", str(self.so(self.day_net, "Dày nét", duong=True)),
-                  "--ti-le", str(self.so(self.ti_le, "Tỉ lệ", duong=True))]
+                  "--ti-le", str(self.so(self.ti_le, "Tỉ lệ", duong=True)),
+                  "--day-khung", str(self.so(self.day_khung, "Dày khung", duong=True)),
+                  "--le-max", str(self.so(self.le_max, "Đệm trục"))]
             lenh.append(("Vẽ bằng Origin 2024", c))
         if self.dung_csv.get():
             c = self.lenh_con("xu_ly_dien_hoa.py", "--worker-csv") + files + chung + nhan_mau

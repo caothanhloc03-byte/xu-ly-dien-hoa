@@ -1,6 +1,6 @@
 {
-  "phien_ban_hien_tai": 3,
+  "phien_ban_hien_tai": 4,
   "ten_ung_dung": "Echem Studio",
   "link_tai_zip": "https://github.com/caothanhloc03-byte/xu-ly-dien-hoa/archive/refs/heads/main.zip",
-  "ghi_chu": "Sửa chuẩn hóa xử lý dữ liệu và chiều đồ thị EIS."
+  "ghi_chu": "Đồ thị Origin: bỏ gạch trên chữ, đệm trục 0.5 bước chia, khung dày hơn."
 }
