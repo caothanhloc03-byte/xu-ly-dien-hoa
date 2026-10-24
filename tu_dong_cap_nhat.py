@@ -26,7 +26,7 @@ VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{N
 ZIP_URL_MAC_DINH = f"https://github.com/{GITHUB_USER}/{GITHUB_REPO}/archive/refs/heads/{NHANH}.zip"
 
 THU_MUC = os.path.dirname(os.path.abspath(__file__))
-DUOI_FILE_CAP_NHAT = (".py", ".pyw", ".ico", ".json")
+DUOI_FILE_CAP_NHAT = (".py", ".pyw", ".ico", ".json", ".md", ".png")
 KHONG_GHI_DE = {"cai_dat.json", "launcher.py"}   # file cấu hình người dùng / file khởi động
 UA = {"User-Agent": "DienHoaOrigin-Updater"}
 

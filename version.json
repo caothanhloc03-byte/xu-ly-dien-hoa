@@ -1,6 +1,6 @@
 {
-  "phien_ban_hien_tai": 4,
+  "phien_ban_hien_tai": 14,
   "ten_ung_dung": "Echem Studio",
   "link_tai_zip": "https://github.com/caothanhloc03-byte/xu-ly-dien-hoa/archive/refs/heads/main.zip",
-  "ghi_chu": "Đồ thị Origin: bỏ gạch trên chữ, đệm trục 0.5 bước chia, khung dày hơn."
+  "ghi_chu": "Sửa: không còn cửa sổ đen (console) khi mở app. Bản chuyên nghiệp: cảnh báo thông minh (ECSA, Tafel, CV...), báo cáo Excel, nhận dạng loại file, cấu hình lưu sẵn, chế độ cơ bản/nâng cao, xem trước hình, nút Dừng, lỗi tiếng Việt + nhật ký, dữ liệu mẫu, hướng dẫn trong app. Sửa lỗi Tafel/điện thế tại 10 mA khi LSV có pic oxi hóa nhỏ."
 }

@@ -20,7 +20,13 @@ def _gom_thu_vien():
     import argparse, glob, json, queue, shutil, subprocess, tempfile, threading, urllib.request, zipfile  # noqa
     import tkinter, tkinter.ttk, tkinter.colorchooser, tkinter.filedialog  # noqa
     import tkinter.messagebox, tkinter.scrolledtext, tkinter.simpledialog  # noqa
+    import tkinter.font, hashlib, datetime, platform, ctypes, csv, re, math, random  # noqa
     import numpy, pandas, matplotlib, matplotlib.pyplot  # noqa
+    import openpyxl  # noqa
+    try:
+        import tkinterdnd2  # noqa  (keo-tha file, tuy chon)
+    except ImportError:
+        pass
     import originpro  # noqa
 
 

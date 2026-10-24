@@ -15,6 +15,15 @@ import os
 import numpy as np
 import pandas as pd
 
+try:                      # cảnh báo dữ liệu & báo cáo: tùy chọn (thiếu file thì bỏ qua)
+    import canh_bao
+except ImportError:
+    canh_bao = None
+try:
+    import bao_cao
+except ImportError:
+    bao_cao = None
+
 # ---- mặc định quy đổi ----
 PH_MAC_DINH = 13.8
 EREF_MAC_DINH = 0.098
@@ -161,19 +170,42 @@ def thong_so_cv_lsv(d, loai):
     return pd.DataFrame(hang)
 
 
+def chon_chu_ky(d, chu_ky=None):
+    """Chu ky dung de ve / tinh toan.
+    - Nguoi dung chon (--chu-ky) thi dung dung chu ky do.
+    - Mac dinh: chu ky CUOI (da on dinh nhat khi chay nhieu chu ky). Neu chu ky cuoi bi cut ngan
+      (do dung do chua xong, < 60% so voi cac chu ky truoc) thi lui ve chu ky day du ngay truoc no."""
+    if chu_ky is not None:
+        return int(chu_ky)
+    cks = sorted(d["chu_ky"].unique())
+    if len(cks) >= 2:
+        n = d.groupby("chu_ky").size()
+        if n.loc[cks[-1]] < 0.6 * n.loc[cks[:-1]].median():
+            return int(cks[-2])
+    return int(cks[-1])
+
+
 def duong_cv_lsv(m, chu_ky=None):
     d = m["d"]
     if m["loai"] == "CV":
-        ck = chu_ky if chu_ky is not None else int(d["chu_ky"].max())
+        ck = chon_chu_ky(d, chu_ky)
         d = d[d["chu_ky"] == ck]
     return d[COT_E].to_numpy(), d[COT_I].to_numpy()
 
 
 # ====================== TAFEL ======================
-def xu_ly_tafel(d, v_min=9.0, v_max=11.0):
+def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None):
     i_val = d[COT_I].to_numpy()
     e_val = d[COT_E].to_numpy()
-    
+
+    # LSV có pic oxi hóa nhỏ ở điện thế thấp (vd Cu ~0.87 V): chỉ lấy NHÁNH SAU CÙNG đi lên qua v_min,
+    # để pic không lọt vào vùng Tafel. Chỉ áp dụng khi E đơn điệu (LSV); CV hai chiều giữ nguyên.
+    dE = np.diff(e_val)
+    if len(dE) and (np.all(dE >= -1e-9) or np.all(dE <= 1e-9)):
+        duoi = np.where(np.abs(i_val) < v_min)[0]
+        if len(duoi) and duoi[-1] < len(i_val) - 3:
+            i_val, e_val = i_val[duoi[-1] + 1:], e_val[duoi[-1] + 1:]
+
     # Lấy vùng từ 9mA đến 11mA (hoặc -9mA đến -11mA đối với dòng khử)
     mask = (np.abs(i_val) >= v_min) & (np.abs(i_val) <= v_max)
     sub_i = i_val[mask]
@@ -195,7 +227,12 @@ def xu_ly_tafel(d, v_min=9.0, v_max=11.0):
         "Potential (V vs RHE)": sub_e,
         "I (mA/cm2)": sub_i
     }).sort_values("Log(J)").reset_index(drop=True)
-    
+
+    if ten is not None and canh_bao:          # ten=None: không cảnh báo (vd gọi từ hỏi đáp)
+        canh_bao.kiem_tra_tafel(df_tafel, tafel_slope, v_min, v_max, ten)
+        if bao_cao:
+            bao_cao.ghi("tafel", {"nhan": ten, "he_so_Tafel (mV/dec)": tafel_slope, "so_diem": len(df_tafel),
+                                  "vung_dong (mA/cm2)": f"{v_min:g} - {v_max:g}"})
     return df_tafel, tafel_slope, a_slope, b_int
 
 
@@ -315,11 +352,11 @@ def _plt():
 def ve_don(m, goc, a):
     plt = _plt()
     loai, d = m["loai"], m["d"]
-    if loai in ("CV", "LSV"):
+    if loai in ("CV", "LSV", "TAFEL"):
         fig, ax = plt.subplots(figsize=FIG)
-        cac = sorted(d["chu_ky"].unique())
-        if a.chu_ky is not None:
-            cac = [a.chu_ky]
+        cac = [chon_chu_ky(d, a.chu_ky)]          # mac dinh: chu ky cuoi
+        if a.mau_theo_chu_ky:
+            cac = sorted(d["chu_ky"].unique())    # tuy chon: ve tat ca cac chu ky
         for ck in cac:
             g = d[d["chu_ky"] == ck]
             if a.mau_theo_chu_ky:
@@ -401,7 +438,7 @@ def bang_so_sanh(loai, muc, a):
             them(f"{m['nhan']} | {NHAN_I}", i)
     elif loai == "TAFEL":
         for m in muc:
-            df_t, slope, _, _ = xu_ly_tafel(m["d"], a.tafel_min, a.tafel_max)
+            df_t, slope, _, _ = xu_ly_tafel(m["d"], a.tafel_min, a.tafel_max, ten=m["nhan"])
             them(f"{m['nhan']} | Log(J)", df_t["Log(J)"].to_numpy())
             them(f"{m['nhan']} | Potential (V vs RHE)", df_t["Potential (V vs RHE)"].to_numpy())
     else:
@@ -431,9 +468,10 @@ def tinh_ecsa(files, a, e_chon, cs, chu_ky, goc_ra, ve=True):
         if loai != "CV":
             print(f"  bo qua {os.path.basename(p)} (khong phai CV)")
             continue
-        ck = chu_ky if chu_ky is not None else int(d["chu_ky"].max())
+        ck = chon_chu_ky(d, chu_ky)
         g = d[d["chu_ky"] == ck]
         v_rate = toc_do_quet(d) * 1000  # mV/s
+        print(f"  {os.path.basename(p)}: dung chu ky {ck}/{int(d['chu_ky'].max())}")
         cac.append((p, d, g, v_rate))
         if ve:
             ax.plot(g[COT_E], g[COT_I], lw=1.4, label=f"{v_rate:.0f} mV/s")
@@ -457,7 +495,7 @@ def tinh_ecsa(files, a, e_chon, cs, chu_ky, goc_ra, ve=True):
     hang = []
     for p, d, g, v_rate in cac:
         ja, jc = noi_suy_dong(g, e_chon)
-        hang.append({"file": os.path.basename(p), "toc_do_quet (mV/s)": v_rate,
+        hang.append({"file": os.path.basename(p), "chu_ky": int(g["chu_ky"].iloc[0]), "toc_do_quet (mV/s)": v_rate,
                      "Ja (mA/cm2)": ja, "Jc (mA/cm2)": jc, "(Ja-Jc)/2 (mA/cm2)": (ja - jc) / 2})
     b = pd.DataFrame(hang).sort_values("toc_do_quet (mV/s)").reset_index(drop=True)
     v = b["toc_do_quet (mV/s)"].to_numpy() / 1000
@@ -469,6 +507,12 @@ def tinh_ecsa(files, a, e_chon, cs, chu_ky, goc_ra, ve=True):
                         "Cs (mF/cm2)": cs, "ECSA (cm2_ECSA / cm2_hinh_hoc)": ecsa, "so_diem": len(b)}])
     b.to_csv(goc_ra + "_ECSA_diem.csv", index=False)
     kq.to_csv(goc_ra + "_ECSA.csv", index=False)
+    if canh_bao:
+        canh_bao.kiem_tra_ecsa(b, he_so, tung, r2, e_chon,
+                               [(g, vr, os.path.basename(p)) for p, _, g, vr in cac])
+    if bao_cao:
+        bao_cao.ghi("ecsa_diem", b)
+        bao_cao.ghi("ecsa", kq)
     
     if ve:
         fig, ax = plt.subplots(figsize=FIG)
@@ -506,6 +550,40 @@ def them_tham_so_chung(ap):
     ap.add_argument("--tafel-min", type=float, default=9.0)
     ap.add_argument("--tafel-max", type=float, default=11.0)
     ap.add_argument("--thu-muc-ra", default=None)
+    ap.add_argument("--khong-canh-bao", action="store_true", help="khong in canh bao (van ghi nhan)")
+    ap.add_argument("--bao-cao", default=None, help="thu muc de xuat bao_cao_tong_hop.xlsx (bo trong = khong xuat)")
+    ap.add_argument("--i-muc-tieu", default="10", help="cac mat do dong muc tieu (mA/cm2) cho bao cao, cach nhau dau phay")
+    ap.add_argument("--e-can-bang", type=float, default=1.23, help="dien the can bang (V) de tinh qua the trong bao cao")
+
+
+def khoi_dong_canh_bao(a):
+    if canh_bao:
+        canh_bao.reset()
+        canh_bao.dat_im_lang(getattr(a, "khong_canh_bao", False))
+    if bao_cao:
+        bao_cao.reset()
+
+
+def kiem_tra_cac_muc(muc, a):
+    if canh_bao:
+        for m in muc:
+            try:
+                canh_bao.kiem_tra_muc(m, a)
+            except Exception as e:
+                print(f"  (canh bao) khong kiem tra duoc {m.get('nhan', '')}: {e}")
+
+
+def ket_thuc(a, ds, muc=None):
+    """Xuất báo cáo Excel (nếu được yêu cầu) và tổng kết cảnh báo."""
+    if getattr(a, "bao_cao", None) and bao_cao:
+        try:
+            duong = bao_cao.xuat(a, ds, a.bao_cao)
+            print(f"  bao cao: {duong}")
+        except Exception as e:
+            print(f"  (canh bao) khong xuat duoc bao cao: {e}")
+    if canh_bao and canh_bao.DANH_SACH:
+        n = canh_bao.dem_canh_bao()
+        print(f"\n>>> TỔNG KẾT: {n} cảnh báo, {len(canh_bao.DANH_SACH) - n} lưu ý/gợi ý (xem các dòng [CẢNH BÁO] / [LƯU Ý] / [GỢI Ý] ở trên).")
 
 
 def mo_rong_file(files):
@@ -529,19 +607,22 @@ def main():
     ap.add_argument("--khong-ve", action="store_true")
     a = ap.parse_args()
     ds = mo_rong_file(a.files)
+    khoi_dong_canh_bao(a)
 
     if a.ecsa:
         goc = goc_ra(a, ds[0])
         tinh_ecsa(ds, a, a.e_ecsa, a.cs, a.chu_ky, goc, ve=not a.khong_ve)
+        ket_thuc(a, ds)
         return
 
     muc = [nap_muc(p, a, k) for k, p in enumerate(ds)]
+    kiem_tra_cac_muc(muc, a)
     for m in muc:
         goc = goc_ra(a, m["duong_dan"])
         d, loai = m["d"], m["loai"]
         d.to_csv(goc + "_xuly.csv", index=False)
-        if loai in ("CV", "LSV"):
-            t = thong_so_cv_lsv(d, loai)
+        if loai in ("CV", "LSV", "TAFEL"):
+            t = thong_so_cv_lsv(d, "CV" if loai == "CV" else "LSV")
         elif loai == "IT":
             t = thong_so_it(d)
         else:
@@ -562,6 +643,7 @@ def main():
             bang_so_sanh(loai, nhom, a).to_csv(goc + ".csv", index=False)
             if not a.khong_ve:
                 ve_chong(loai, nhom, goc, a)
+    ket_thuc(a, ds, muc)
 
 
 if __name__ == "__main__":
