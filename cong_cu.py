@@ -46,12 +46,12 @@ def _cat_cua_so(g, bien, tu, den):
 class NguCanh:
     """Giữ danh sách file + thông số quy đổi, và cung cấp các công cụ để AI gọi."""
 
-    def __init__(self, files, ph, eref, nhan_i, chia_i, loai=None):
+    def __init__(self, files, ph, eref, nhan_i, chia_i, loai=None, r_s=0.0, ir_pct=100.0, khong_rhe=False):
         self.files = list(files)  # [(duong_dan, nhan), ...]
         self.ph, self.eref, self.nhan_i, self.chia_i = ph, eref, nhan_i, chia_i
         self.a = SimpleNamespace(ph=ph, eref=eref, nhan_i=nhan_i, chia_i=chia_i, loai=loai, chu_ky=None,
                                  mau=xl.MAU, mau_theo_chu_ky=False, nhan=[n for _, n in self.files],
-                                 mau_file=[], chong=False, noi_tiep=False, tafel_min=9.0, tafel_max=11.0)
+                                 mau_file=[], chong=False, noi_tiep=False, tafel_min=9.0, tafel_max=11.0, r_s=r_s, ir_phan_tram=ir_pct, khong_rhe=khong_rhe)
         self._cache = {}
 
     # ---- tra cứu file ----

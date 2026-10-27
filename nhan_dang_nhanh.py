@@ -87,3 +87,34 @@ def phat_hien(duong_dan):
 
 def ten_ngan(duong_dan):
     return os.path.splitext(os.path.basename(duong_dan))[0]
+
+
+# ---------------------------------------------------------------- quét cả thư mục
+DUOI_DU_LIEU = (".txt", ".csv", ".dat")
+BO_QUA_THU_MUC = ("csv_va_anh_nhanh", "_lich_su_chay", "_sao_luu", "xem_truoc", "__pycache__")
+BO_QUA_HAU_TO = ("_xuly.csv", "_thongso.csv", "_ecsa.csv", "_ecsa_diem.csv", "_tafel.csv", "fit_eis.csv", "pho_xep_chong.csv")
+
+
+def quet_thu_muc(thu_muc, de_quy=True):
+    """Trả về [(đường dẫn, kết quả phat_hien)] cho mọi file số liệu trong thư mục (bỏ qua thư mục/ file do app tự sinh ra)."""
+    import os
+    ra = []
+    for goc, ds_con, ds_file in os.walk(thu_muc):
+        ds_con[:] = sorted(d for d in ds_con if d.lower() not in BO_QUA_THU_MUC and not d.startswith(("_", ".")))
+        for ten in sorted(ds_file):
+            t = ten.lower()
+            if not t.endswith(DUOI_DU_LIEU) or t.endswith(BO_QUA_HAU_TO) or t.startswith("~$") or t.startswith("bao_cao"):
+                continue
+            p = os.path.join(goc, ten)
+            ra.append((p, phat_hien(p)))
+        if not de_quy:
+            break
+    return ra
+
+
+def tom_tat(ket_qua):
+    """{'CV': n, 'LSV': n, ...} và gợi ý dạng văn bản."""
+    dem = {}
+    for _, r in ket_qua:
+        dem[r["loai"]] = dem.get(r["loai"], 0) + 1
+    return dem

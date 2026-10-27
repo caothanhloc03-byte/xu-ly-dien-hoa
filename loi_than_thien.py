@@ -17,12 +17,12 @@ import tempfile
 MAU_LOI = [
     (r"Chua cai originpro|No module named ['\"]originpro['\"]",
      "Chưa có thư viện điều khiển Origin (originpro).",
-     "Cài bằng:  python -m pip install originpro  (cần Windows + Origin 2024). Với bản exe, build lại bằng build.bat. "
-     "Nếu không có Origin, bỏ tick 'Vẽ bằng Origin 2024' và chỉ dùng 'Xuất CSV & Ảnh Matplotlib'."),
+     "Cài bằng:  python -m pip install originpro  (cần Windows + Origin 2021 trở lên, khuyến nghị 2022+). Với bản exe, build lại bằng build.bat. "
+     "Nếu không có Origin, bỏ tick 'Vẽ bằng Origin' và chỉ dùng 'Xuất CSV & Ảnh Matplotlib'."),
     (r"com_error|pywintypes|Failed to (start|connect)|could not (start|connect)|RPC server|OriginExt",
      "Không kết nối được Origin.",
-     "Mở Origin 2024 một lần cho đến khi thấy giao diện chính (đóng hộp thoại kích hoạt/cập nhật nếu có), "
-     "đóng các hộp thoại đang mở rồi chạy lại. Kiểm tra bản quyền Origin còn hạn và Origin là bản 2024 trở lên."),
+     "Mở Origin một lần cho đến khi thấy giao diện chính (đóng hộp thoại kích hoạt/cập nhật nếu có), "
+     "đóng các hộp thoại đang mở rồi chạy lại. Kiểm tra bản quyền Origin còn hạn và Origin là bản 2022 trở lên (originpro cần Origin 2021 trở lên)."),
     (r"UnicodeEncodeError|UnicodeDecodeError",
      "Lỗi mã hóa ký tự tiếng Việt.",
      "Bấm 'Kiểm tra cập nhật' để lấy bản mới nhất. Nếu vẫn lỗi, tên file/thư mục có thể chứa ký tự lạ: thử đổi sang tên đơn giản."),
@@ -133,9 +133,9 @@ def kiem_tra_truoc(muc, dung_origin, thu_muc_ra, loai_chon="Tự nhận dạng")
     # Origin
     if dung_origin:
         if os.name != "nt":
-            loi.append("Vẽ bằng Origin chỉ chạy được trên Windows. Hãy bỏ tick 'Vẽ bằng Origin 2024'.")
+            loi.append("Vẽ bằng Origin chỉ chạy được trên Windows. Hãy bỏ tick 'Vẽ bằng Origin'.")
         elif origin_da_cai() is False:
-            luu_y.append("Không tìm thấy Origin trong danh sách phần mềm đã cài. Nếu Origin 2024 đã cài, bạn có thể bỏ qua lưu ý này.")
+            luu_y.append("Không tìm thấy Origin trong danh sách phần mềm đã cài. Nếu Origin đã cài, bạn có thể bỏ qua lưu ý này.")
     # loại phép đo chọn so với nhận dạng
     loai_goc = (loai_chon or "").split(" ")[0].upper()
     if loai_goc in ("LSV", "CV", "IT", "EIS", "ECSA", "TAFEL"):

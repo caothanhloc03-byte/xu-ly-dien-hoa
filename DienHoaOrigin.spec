@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = []
 binaries = []
-hiddenimports = ['win32com.client', 'pythoncom', 'openpyxl']
+hiddenimports = ['win32com.client', 'pythoncom', 'openpyxl', 'matplotlib.backends.backend_pdf', 'matplotlib.backends.backend_svg', 'matplotlib.backends.backend_agg', 'PIL.TiffImagePlugin']
 tmp_ret = collect_all('originpro')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('OriginExt')

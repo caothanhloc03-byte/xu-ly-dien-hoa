@@ -7,11 +7,13 @@ echo === Dong goi (chi chua Python + thu vien, ma nguon de ben ngoai) ===
 python -m PyInstaller --noconfirm --clean --onedir --name DienHoaOrigin --icon logo.ico ^
   --collect-all originpro --collect-all OriginExt --collect-all tkinterdnd2 ^
   --hidden-import win32com.client --hidden-import pythoncom --hidden-import openpyxl ^
+  --hidden-import matplotlib.backends.backend_pdf --hidden-import matplotlib.backends.backend_svg --hidden-import matplotlib.backends.backend_agg ^
+  --hidden-import PIL.TiffImagePlugin ^
   launcher.py || goto loi
 echo === Chep ma nguon vao dist\DienHoaOrigin\ma_nguon ===
 set OUT=dist\DienHoaOrigin\ma_nguon
 mkdir "%OUT%" 2>nul
-for %%F in (giao_dien.pyw ve_origin.py xu_ly_dien_hoa.py tu_dong_cap_nhat.py cong_cu.py hoi_dap.py canh_bao.py bao_cao.py nhan_dang_nhanh.py loi_than_thien.py mau_du_lieu.py version.json logo.ico logo_256.png HUONG_DAN.md) do copy /Y "%%F" "%OUT%\" >nul
+for %%F in (*.py *.pyw version.json logo.ico logo_256.png logo_1024.png HUONG_DAN.md) do copy /Y "%%F" "%OUT%\" >nul
 echo.
 echo === XONG ===
 echo Nen thu muc  %~dp0dist\DienHoaOrigin  thanh .zip de gui dong nghiep,

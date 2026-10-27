@@ -18,6 +18,7 @@ GOI_Y = """Bạn có thể hỏi (có dấu hoặc không dấu đều được)
   • quá thế tại 10 mA                      → như trên, trừ điện thế cân bằng (mặc định 1.23 V; "cân bằng 0 V" để đổi)
   • dòng tại 1.6 V                         → mật độ dòng tại điện thế 1.6 V vs RHE
   • tafel / tafel vùng 5 đến 15 mA         → hệ số Tafel (mV/dec)
+  • so sánh các mẫu / xếp hạng / hoạt độ khối / tof  → bảng quá thế, Tafel, hạng (cần điền mục 3c cho hoạt độ khối, TOF)
   • ecsa / ecsa cs 0.04 tại 1.0 V          → Cdl và ECSA từ các file CV
   • dòng lớn nhất / dòng trung bình từ 1.4 đến 1.9 V   → thống kê một đoạn E
   • dòng trung bình từ 0 đến 2 giờ         → thống kê một đoạn thời gian (file IT)
@@ -232,6 +233,39 @@ def _thong_ke(nc, q, ds):
 
 
 # ====================== ĐIỀU PHỐI ======================
+def _so_sanh(nc, _q, ds):
+    import so_sanh
+    muc = []
+    for k in ds:
+        try:
+            m = nc.lay(k + 1)[1]
+        except Exception as e:
+            continue
+        muc.append(m)
+    a = nc.a
+    for ten, mac in (("i_muc_tieu", "10"), ("qua_the_ht", "300"), ("e_can_bang", 1.23), ("n_e", "4"), ("ti_le_tam", "1")):
+        if not hasattr(a, ten):
+            setattr(a, ten, mac)
+    df, info = so_sanh.tong_hop(muc, a)
+    if df is None:
+        return "Không có file CV/LSV nào để so sánh."
+    dong = ["So sánh các mẫu (hạng 1 = quá thế thấp nhất):"]
+    for _, r in df.iterrows():
+        h = r.get("Hạng")
+        phan = [("#%d " % int(h)) if h is not None and not so_sanh.pd.isna(h) else "   ", str(r["Nhãn"])]
+        for j in info["ds_j"]:
+            phan.append(f" | η@{j:g} mA = {so_sanh._fmt(r.get(f'η tại {j:g} mA/cm² (mV)'), 0)} mV")
+        phan.append(f" | Tafel = {so_sanh._fmt(r.get('Tafel (mV/dec)'), 1)} mV/dec")
+        for c in df.columns:
+            if c.startswith("Hoạt độ khối") or c.startswith("TOF"):
+                phan.append(f" | {c} = {so_sanh._fmt(r.get(c), 3)}")
+        dong.append("".join(phan))
+    if not any(c.startswith("Hoạt độ khối") for c in df.columns):
+        dong.append("(Muốn có hoạt độ khối/TOF: điền tải trọng, tâm hoạt động ở mục 3c rồi hỏi lại.)")
+    dong.append("Biểu đồ cột và bảng đầy đủ: bật 'Bảng so sánh & biểu đồ cột các mẫu' rồi bấm CHẠY.")
+    return "\n".join(dong)
+
+
 def tra_loi(cau_hoi, nc):
     """Trả lời câu hỏi về dữ liệu. Luôn trả về chuỗi (kể cả khi không hiểu)."""
     q = chuan_hoa(cau_hoi).strip()
@@ -251,6 +285,8 @@ def tra_loi(cau_hoi, nc):
         return GOI_Y
     if re.search(r"liet ke|danh sach|co nhung file|co file nao|file nao|tong quan file|\bcac file\b.*\bnao\b", q):
         ket_qua.append(_liet_ke(nc, q, ds))
+    if re.search(r"so sanh|xep hang|hoat do khoi|mass activity|\btof\b|turnover", q):
+        ket_qua.append(_so_sanh(nc, q, ds))
     if re.search(r"\becsa\b|\bcdl\b|dien tich hoat dong", q):
         ket_qua.append(_ecsa(nc, q, ds, da_chi_dinh))
     if re.search(r"\btafel\b", q):

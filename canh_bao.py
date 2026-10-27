@@ -215,12 +215,12 @@ def goi_y_dien_the(cac, e_hien_tai, so_diem=41):
 
 
 # ====================== TAFEL ======================
-def kiem_tra_tafel(df_t, slope, v_min, v_max, ten=""):
+def kiem_tra_tafel(df_t, slope, v_min, v_max, ten="", theo_e=False):
     n = len(df_t)
     if n < 5:
         them(CANH_BAO, f"chỉ có {n} điểm trong vùng Tafel, kết quả kém tin cậy.", ten)
     I = np.abs(df_t["I (mA/cm2)"].to_numpy())
-    if n and (I.min() < v_min * 0.999 or I.max() > v_max * 1.001):
+    if n and not theo_e and (I.min() < v_min * 0.999 or I.max() > v_max * 1.001):
         them(CANH_BAO, f"dòng không có đủ điểm trong vùng {v_min:g}–{v_max:g} mA/cm²; app đã lấy {n} điểm gần giá trị giữa vùng. "
                        "Hãy chỉnh lại vùng dòng Tafel cho phù hợp.", ten)
     r2 = _r2(df_t["Log(J)"], df_t["Potential (V vs RHE)"])

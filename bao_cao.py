@@ -13,7 +13,7 @@ import datetime
 import os
 import platform
 
-LUU = {"tafel": [], "ecsa_diem": None, "ecsa": None}
+LUU = {"tafel": [], "ecsa_diem": None, "ecsa": None, "so_sanh": None, "so_sanh_nhom": None, "so_sanh_tai_lieu": None, "fe": None, "fit_eis": None, "tof_cv": None}
 TEN_FILE = "bao_cao_tong_hop"
 
 
@@ -21,6 +21,8 @@ def reset():
     LUU["tafel"] = []
     LUU["ecsa_diem"] = None
     LUU["ecsa"] = None
+    for k in ("so_sanh", "so_sanh_nhom", "so_sanh_tai_lieu", "fe", "fit_eis", "tof_cv"):
+        LUU[k] = None
 
 
 def ghi(ten, gia_tri):
@@ -128,6 +130,13 @@ def _thong_tin(a, ds):
         ("Vùng dòng Tafel (mA/cm²)", f"{getattr(a, 'tafel_min', '')} - {getattr(a, 'tafel_max', '')}"),
         ("Cs dùng cho ECSA (mF/cm²)", getattr(a, "cs", "")),
         ("Điện thế cân bằng dùng tính quá thế (V)", getattr(a, "e_can_bang", "")),
+        ("Bù iR: Rs (Ω) / phần trăm bù", f"{getattr(a, 'r_s', 0) or 0} / {getattr(a, 'ir_phan_tram', 100)}"),
+        ("Tải trọng xúc tác (mg/cm²)", getattr(a, "tai_trong", None) or ""),
+        ("Số tâm hoạt động (µmol/cm²) / M (g/mol) / tỉ lệ tâm", f"{getattr(a, 'so_mol_tam', None) or ''} / {getattr(a, 'khoi_luong_mol', None) or ''} / {getattr(a, 'ti_le_tam', '')}"),
+        ("Quá thế khảo sát (mV) / n electron", f"{getattr(a, 'qua_the_ht', '')} / {getattr(a, 'n_e', '')}"),
+        ("Vùng Tafel theo điện thế (V)", f"{getattr(a, 'tafel_e_min', '')} - {getattr(a, 'tafel_e_max', '')}" if getattr(a, "tafel_e_min", None) is not None else ""),
+        ("Chế độ điện thế", "Điện thế tế bào (không quy đổi RHE)" if getattr(a, "khong_rhe", False) else "RHE"),
+        ("FE: thể tích khí (mL) / T (°C) / P (kPa) / n", f"{getattr(a, 'fe_v_h2', None) or ''} / {getattr(a, 'fe_nhiet_do', '')} / {getattr(a, 'fe_ap_suat', '')} / {getattr(a, 'fe_n', '')}"),
         ("Số file", len(ds)),
     ] + [(f"File {i + 1}", p) for i, p in enumerate(ds)]
 
@@ -153,6 +162,8 @@ def tao_noi_dung(a, ds):
         except ValueError:
             pass
     e_cb = getattr(a, "e_can_bang", None)
+    if getattr(a, "khong_qua_the", False) or getattr(a, "khong_rhe", False):
+        e_cb = None
 
     sheets = []
     if getattr(a, "ecsa", False):
@@ -164,7 +175,9 @@ def tao_noi_dung(a, ds):
     else:
         files = [(p, (a.nhan[k] if getattr(a, "nhan", None) and k < len(a.nhan) and a.nhan[k] else os.path.splitext(os.path.basename(p))[0]))
                  for k, p in enumerate(ds)]
-        nc = cong_cu.NguCanh(files, a.ph, a.eref, a.nhan_i, a.chia_i, None if loai_ep == "TAFEL" else loai_ep)
+        nc = cong_cu.NguCanh(files, a.ph, a.eref, a.nhan_i, a.chia_i, None if loai_ep == "TAFEL" else loai_ep,
+                             r_s=getattr(a, "r_s", 0.0) or 0.0, ir_pct=getattr(a, "ir_phan_tram", 100.0),
+                             khong_rhe=getattr(a, "khong_rhe", False))
         nhom = {}
         for k in range(len(files)):
             try:
@@ -184,6 +197,10 @@ def tao_noi_dung(a, ds):
             sheets.append(("Tafel", _bang_tafel()))
         if nhom.get("loi"):
             sheets.append(("Lỗi đọc file", nhom["loi"]))
+    for khoa, ten_sheet in (("so_sanh", "So sánh mẫu"), ("so_sanh_nhom", "Nhóm (TB ± SD)"), ("so_sanh_tai_lieu", "So sánh tài liệu"),
+                            ("fe", "Hiệu suất Faraday"), ("fit_eis", "Fit EIS"), ("tof_cv", "TOF từ CV")):
+        if LUU.get(khoa):
+            sheets.append((ten_sheet, LUU[khoa]))
     cb = _bang_canh_bao()
     sheets.append(("Cảnh báo", cb if cb else [{"Mức độ": "", "Đối tượng": "", "Nội dung": "Không phát hiện vấn đề nào."}]))
     sheets.append(("Thông tin", [{"Mục": k, "Giá trị": v} for k, v in _thong_tin(a, ds)]))

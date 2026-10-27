@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Xử lý file điện hóa thô và VẼ TRỰC TIẾP TRONG ORIGIN (Origin 2024).
+Xử lý file điện hóa thô và VẼ TRỰC TIẾP TRONG ORIGIN (Origin 2022 trở lên).
 Hỗ trợ vẽ Nyquist EIS so sánh, CV ECSA đa tốc độ quét và Biểu đồ Tafel.
 """
 import argparse
@@ -15,7 +15,7 @@ import xu_ly_dien_hoa as xl
 try:
     import originpro as op
 except ImportError:
-    sys.exit("Chua cai originpro. Hay chay:  python -m pip install originpro   (can Windows + Origin 2024)")
+    sys.exit("Chua cai originpro. Hay chay:  python -m pip install originpro   (can Windows + Origin 2021 tro len, khuyen nghi 2022+)")
 
 
 # ====================== TIỆN ÍCH ORIGIN ======================
@@ -56,10 +56,38 @@ def tao_do_thi(ten, template):
         return op.new_graph(template=mau)
 
 
+def dat_mau(p, mau):
+    """Đặt màu đường: thử thuộc tính color (hex); Origin cũ không nhận thì dùng lệnh LabTalk set %C -c color(r,g,b)."""
+    try:
+        p.color = mau
+        return
+    except Exception:
+        pass
+    try:
+        h = str(mau).lstrip("#")
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        p.set_cmd(f"-c color({r},{g},{b})")
+    except Exception as e:
+        print(f"  (canh bao) khong dat duoc mau {mau}: {e}")
+
+
+def phien_ban_origin():
+    """In phiên bản Origin đang điều khiển (nội bộ: 2021 = 9.8, 2022 = 9.9, 2023 = 10.0, 2024 = 10.1, 2025 = 10.2)."""
+    try:
+        v = float(op.lt_float("@V"))
+    except Exception:
+        return None
+    ten = {9.8: "2021", 9.9: "2022", 10.0: "2023", 10.1: "2024", 10.2: "2025"}.get(round(v, 1), "")
+    print(f"  Origin phien ban noi bo {v:g}" + (f" (Origin {ten})" if ten else ""))
+    if v < 9.75:
+        print("  (canh bao) Origin cu hon 2021: thu vien originpro can Origin 2021 tro len - hinh co the khong ve duoc.")
+    return v
+
+
 def them_duong(gl, wks, cot_x, cot_y, mau, a, kieu=200):
     p = gl.add_plot(wks, coly=chu_cot(cot_y), colx=chu_cot(cot_x), type=kieu)
     if mau:
-        p.color = mau
+        dat_mau(p, mau)
     if kieu != 201:
         try:
             p.set_cmd(f"-w {int(round(500 * a.day_net))}")
@@ -198,7 +226,7 @@ def ve_cv_lsv_chong(loai, muc, a):
         x, y = xl.duong_cv_lsv(m, a.chu_ky)
         xs.append(x)
         ys.append(y)
-        ghi_cot(wks, 2 * k, x, "E", "V vs RHE", m["nhan"], "X")
+        ghi_cot(wks, 2 * k, x, "E", "V", m["nhan"], "X")
         ghi_cot(wks, 2 * k + 1, y, m["nhan"], "mA/cm2", m["nhan"], "Y")
     gp = tao_do_thi(ten, a.template)
     gl = gp[0]
@@ -231,18 +259,94 @@ def ve_tafel_chong(muc, a):
     _, wks = tao_so(ten)
     xs, ys = [], []
     for k, m in enumerate(muc):
-        df_t, slope, _, _ = xl.xu_ly_tafel(m["d"], a.tafel_min, a.tafel_max, ten=m["nhan"])
+        df_t, slope, a_s, b_i = xl.tafel_a(m["d"], a, ten=m["nhan"])
         nhan_s = f"{m['nhan']} ({slope:.1f} mV/dec)"
-        xs.append(df_t["Log(J)"].to_numpy())
+        lj = df_t["Log(J)"].to_numpy()
+        xf = np.array([lj.min(), lj.max()])
+        xs.append(lj)
         ys.append(df_t["Potential (V vs RHE)"].to_numpy())
-        ghi_cot(wks, 2 * k, df_t["Log(J)"], "Log(J)", "", nhan_s, "X")
-        ghi_cot(wks, 2 * k + 1, df_t["Potential (V vs RHE)"], nhan_s, "V vs RHE", nhan_s, "Y")
+        ghi_cot(wks, 4 * k, df_t["Log(J)"], "Log(J)", "", nhan_s, "X")
+        ghi_cot(wks, 4 * k + 1, df_t["Potential (V vs RHE)"], nhan_s, "V", nhan_s, "Y")
+        ghi_cot(wks, 4 * k + 2, xf, "Log(J) fit", "", nhan_s, "X")
+        ghi_cot(wks, 4 * k + 3, a_s * xf + b_i, f"{nhan_s} fit", "V", nhan_s, "Y")
     gp = tao_do_thi(ten, a.template)
     gl = gp[0]
     for k, m in enumerate(muc):
-        them_duong(gl, wks, 2 * k, 2 * k + 1, m["mau"], a, kieu=202)
-    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Log(J)", "Potential (V vs RHE)",
+        them_duong(gl, wks, 4 * k, 4 * k + 1, m["mau"], a, kieu=201)        # diem
+        them_duong(gl, wks, 4 * k + 2, 4 * k + 3, m["mau"], a, kieu=200)    # duong fit
+    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Log(J)", xl.NHAN_POT,
                   x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(muc), khoang=khoang_tu_args(a))
+
+
+def ve_tof(muc, a):
+    """Hình TOF theo điện thế RHE (TOF = |I|/(nFN), N = Q/(nF)) bằng Origin; bảng số do tof_cv.chay ghi.
+    Đường CV (J theo E) đã có trong hình CV chồng của app."""
+    import tof_cv
+    kq = tof_cv.chay(muc, a, a.thu_muc_ra, ve=False)
+    if not kq:
+        return
+    _, dd = kq
+    ten = "So_sanh_TOF"
+    _, wks = tao_so(ten)
+    xs, ys = [], []
+    for k, (m, b) in enumerate(dd):
+        xs.append(b[tof_cv.COT_E_RHE].to_numpy())
+        ys.append(b[tof_cv.COT_TOF].to_numpy())
+        ghi_cot(wks, 2 * k, b[tof_cv.COT_E_RHE], "E", "V vs RHE", m["nhan"], "X")
+        ghi_cot(wks, 2 * k + 1, b[tof_cv.COT_TOF], m["nhan"], "s-1", m["nhan"], "Y")
+    gp = tao_do_thi(ten, a.template)
+    gl = gp[0]
+    for k, (m, _) in enumerate(dd):
+        them_duong(gl, wks, 2 * k, 2 * k + 1, m["mau"], a)
+    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Potential (V vs RHE)", "TOF (s\u207b\u00b9)",
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(dd), khoang=khoang_tu_args(a))
+    a.da_ve_tof_origin = True
+
+
+def ve_qs_tof(a, ds):
+    """Công cụ Qs-LSV & TOF bằng Origin: 3 hình - Qs_CV (đường CV), Qs_TOF (TOF theo E vs RHE, các điểm Qs-LSV nối nhau),
+    Qs_LSV_J-E (đường phân cực Qs-LSV). Bảng số/CSV do qs_lsv.chay ghi."""
+    import qs_lsv
+    a.chong = False
+    muc = [xl.nap_muc(p, a, k) for k, p in enumerate(ds)]
+    kq = qs_lsv.chay(muc, a, a.thu_muc_ra, ve=False)
+    if not kq:
+        print("  (canh bao) khong co mau nao du CV + Qs-LSV de ve bang Origin.")
+        return
+    _, cac = kq
+    # ---- (A) CV ----
+    ten = "Qs_CV"
+    _, wks = tao_so(ten)
+    xs, ys = [], []
+    for k, c in enumerate(cac):
+        e, i = c["cv"][xl.COT_E].to_numpy(), c["cv"][xl.COT_I].to_numpy()
+        xs.append(e)
+        ys.append(i)
+        ghi_cot(wks, 2 * k, e, "E", "V vs RHE", c["m"]["nhan"], "X")
+        ghi_cot(wks, 2 * k + 1, i, c["m"]["nhan"], "mA/cm2", c["m"]["nhan"], "Y")
+    gp = tao_do_thi(ten, a.template)
+    gl = gp[0]
+    for k, c in enumerate(cac):
+        them_duong(gl, wks, 2 * k, 2 * k + 1, c["m"]["mau"], a)
+    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Potential (V vs RHE)", "Current density (mA cm\u207b\u00b2)",
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(cac), khoang=khoang_tu_args(a))
+    # ---- (B) TOF và đường phân cực Qs-LSV ----
+    for ten, cot, nhan_y, nhan_don_vi in (("Qs_TOF", qs_lsv.C_TOF, "TOF (s\u207b\u00b9)", "s-1"),
+                                          ("Qs_LSV_J-E", qs_lsv.C_J, "Current density (mA cm\u207b\u00b2)", "mA/cm2")):
+        _, wks = tao_so(ten)
+        xs, ys = [], []
+        for k, c in enumerate(cac):
+            qs = c["qs"]
+            xs.append(qs[qs_lsv.C_E].to_numpy())
+            ys.append(qs[cot].to_numpy())
+            ghi_cot(wks, 2 * k, qs[qs_lsv.C_E], "E", "V vs RHE", c["m"]["nhan"], "X")
+            ghi_cot(wks, 2 * k + 1, qs[cot], c["m"]["nhan"], nhan_don_vi, c["m"]["nhan"], "Y")
+        gp = tao_do_thi(ten, a.template)
+        gl = gp[0]
+        for k, c in enumerate(cac):
+            them_duong(gl, wks, 2 * k, 2 * k + 1, c["m"]["mau"], a, kieu=202)      # duong + diem
+        hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Potential (V vs RHE)", nhan_y,
+                      x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(cac), khoang=khoang_tu_args(a))
 
 
 # ====================== EIS SO SÁNH ======================
@@ -356,7 +460,16 @@ def main():
 
     if getattr(op, "oext", False):
         op.set_show(True)
+    phien_ban_origin()
 
+    if getattr(a, "qs_tof", False):
+        ve_qs_tof(a, ds)
+        op.save(os.path.join(a.thu_muc_ra, a.ten_du_an))
+        if a.dong_origin and getattr(op, "oext", False):
+            op.exit()
+        return
+
+    muc = None
     if a.ecsa:
         ve_ecsa(ds, a)
     else:
@@ -376,7 +489,12 @@ def main():
             elif loai == "IT":
                 ve_it_chong(nhom, a)
 
-    xl.ket_thuc(a, ds)
+    if muc and getattr(a, "tof_cv", False):
+        try:
+            ve_tof(muc, a)
+        except Exception as e:
+            print(f"  (canh bao) khong ve duoc hinh TOF bang Origin: {e}")
+    xl.ket_thuc(a, ds, muc)
     du_an = os.path.join(a.thu_muc_ra, a.ten_du_an)
     op.save(du_an)
     if a.dong_origin and getattr(op, "oext", False):

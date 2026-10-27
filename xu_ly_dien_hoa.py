@@ -11,6 +11,7 @@ QUY ĐỔI (mặc định):
 import argparse
 import glob
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -36,6 +37,7 @@ COT_E = "RHE (V)"
 COT_I = "I (mA/cm2)"
 COT_T = "T (h)"
 NHAN_E = "E (V vs. RHE)"
+NHAN_POT = "Potential (V vs RHE)"
 NHAN_I = "I (mA/cm²)"
 
 MAU = "#1f77b4"
@@ -102,10 +104,25 @@ def nhan_dang(nhan, df, ep=None):
 # ====================== QUY ĐỔI CHUNG ======================
 def quy_doi(df, a):
     d = pd.DataFrame({"E (V)": df["c1"], "i (A/cm2)": df["c2"], "T (s)": df["c3"]})
-    d[COT_E] = d["E (V)"] + 0.0592 * a.ph + a.eref
+    if getattr(a, "khong_rhe", False):      # dien the te bao (2 dien cuc): khong quy doi sang RHE
+        d[COT_E] = d["E (V)"]
+    else:
+        d[COT_E] = d["E (V)"] + 0.0592 * a.ph + a.eref
+    r_s = float(getattr(a, "r_s", 0.0) or 0.0)
+    if r_s:        # bu iR: E_that = E_do - i*Rs*(phan tram bu/100); i la DONG DO THUC (A, cot tho)
+        d[COT_E] = d[COT_E] - d["i (A/cm2)"] * r_s * float(getattr(a, "ir_phan_tram", 100.0)) / 100.0
     d[COT_I] = d["i (A/cm2)"] * 1000 * a.nhan_i / a.chia_i
     d[COT_T] = d["T (s)"] / 3600.0
     return d
+
+
+def rs_tu_eis(duong_dan):
+    """Ước lượng Rs (ohm) từ file EIS: Z' tại điểm gần trục thực nhất trong 1/3 vùng tần số cao nhất."""
+    tho, _ = doc_file_tho(duong_dan)
+    d = xu_ly_eis(tho)
+    cao = d.iloc[:max(3, len(d) // 3)]
+    k = (cao["-Z'' (ohm)"].abs()).idxmin()
+    return float(d.loc[k, "Z' (ohm)"])
 
 
 # ====================== CV / LSV ======================
@@ -194,24 +211,30 @@ def duong_cv_lsv(m, chu_ky=None):
 
 
 # ====================== TAFEL ======================
-def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None):
+def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None, e_min=None, e_max=None):
     i_val = d[COT_I].to_numpy()
     e_val = d[COT_E].to_numpy()
 
     # LSV có pic oxi hóa nhỏ ở điện thế thấp (vd Cu ~0.87 V): chỉ lấy NHÁNH SAU CÙNG đi lên qua v_min,
     # để pic không lọt vào vùng Tafel. Chỉ áp dụng khi E đơn điệu (LSV); CV hai chiều giữ nguyên.
+    theo_e = e_min is not None and e_max is not None
     dE = np.diff(e_val)
-    if len(dE) and (np.all(dE >= -1e-9) or np.all(dE <= 1e-9)):
+    if not theo_e and len(dE) and (np.all(dE >= -1e-9) or np.all(dE <= 1e-9)):
         duoi = np.where(np.abs(i_val) < v_min)[0]
         if len(duoi) and duoi[-1] < len(i_val) - 3:
             i_val, e_val = i_val[duoi[-1] + 1:], e_val[duoi[-1] + 1:]
 
-    # Lấy vùng từ 9mA đến 11mA (hoặc -9mA đến -11mA đối với dòng khử)
-    mask = (np.abs(i_val) >= v_min) & (np.abs(i_val) <= v_max)
+    # Lấy vùng từ 9mA đến 11mA (hoặc -9mA đến -11mA đối với dòng khử); hoặc theo khoảng điện thế nếu được chọn
+    if theo_e:
+        mask = (e_val >= min(e_min, e_max)) & (e_val <= max(e_min, e_max)) & (np.abs(i_val) > 0)
+        if mask.sum() < 3:
+            raise ValueError(f"Vùng điện thế Tafel {e_min:g}~{e_max:g} V có quá ít điểm dữ liệu (<3).")
+    else:
+        mask = (np.abs(i_val) >= v_min) & (np.abs(i_val) <= v_max)
     sub_i = i_val[mask]
     sub_e = e_val[mask]
     
-    if len(sub_i) < 3:
+    if len(sub_i) < 3 and not theo_e:
         # Nếu dòng không đủ rộng, lấy khoảng tự động quanh 10mA
         idx_sort = np.argsort(np.abs(np.abs(i_val) - (v_min + v_max) / 2))
         sel = idx_sort[:min(30, len(i_val))]
@@ -229,11 +252,17 @@ def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None):
     }).sort_values("Log(J)").reset_index(drop=True)
 
     if ten is not None and canh_bao:          # ten=None: không cảnh báo (vd gọi từ hỏi đáp)
-        canh_bao.kiem_tra_tafel(df_tafel, tafel_slope, v_min, v_max, ten)
+        canh_bao.kiem_tra_tafel(df_tafel, tafel_slope, v_min, v_max, ten, theo_e=theo_e)
         if bao_cao:
             bao_cao.ghi("tafel", {"nhan": ten, "he_so_Tafel (mV/dec)": tafel_slope, "so_diem": len(df_tafel),
-                                  "vung_dong (mA/cm2)": f"{v_min:g} - {v_max:g}"})
+                                  "vung_dong (mA/cm2)": (f"E {min(e_min, e_max):g} - {max(e_min, e_max):g} V" if theo_e else f"{v_min:g} - {v_max:g}")})
     return df_tafel, tafel_slope, a_slope, b_int
+
+
+def tafel_a(d, a, ten=None):
+    """xu_ly_tafel voi cac tuy chon trong a (vung dong hoac vung dien the)."""
+    return xu_ly_tafel(d, float(getattr(a, "tafel_min", 9.0)), float(getattr(a, "tafel_max", 11.0)), ten=ten,
+                       e_min=getattr(a, "tafel_e_min", None), e_max=getattr(a, "tafel_e_max", None))
 
 
 # ====================== IT ======================
@@ -319,7 +348,8 @@ def nap_muc(p, a, k):
         d, loai = xu_ly_cv_lsv(tho, a)
         if ep in ("CV", "LSV", "TAFEL"):
             loai = ep
-    return {"duong_dan": p, "ten": ten, "nhan": nhan, "mau": mau_cua(a, k), "loai": loai, "d": d}
+    nhom_lap = a.nhom[k] if getattr(a, "nhom", None) and k < len(a.nhom) and a.nhom[k] else ""
+    return {"duong_dan": p, "ten": ten, "nhan": nhan, "mau": mau_cua(a, k), "loai": loai, "d": d, "nhom": nhom_lap}
 
 
 # ====================== VẼ (MATPLOTLIB) ======================
@@ -402,11 +432,12 @@ def ve_chong(loai, muc, goc, a):
     elif loai == "TAFEL":
         fig, ax = plt.subplots(figsize=FIG)
         for m in muc:
-            df_t, slope, a_s, b_i = xu_ly_tafel(m["d"], a.tafel_min, a.tafel_max)
-            ax.plot(df_t["Log(J)"], df_t["Potential (V vs RHE)"], "o--", ms=4, lw=1.5,
-                    color=m["mau"], label=f"{m['nhan']} ({slope:.1f} mV/dec)")
+            df_t, slope, a_s, b_i = tafel_a(m["d"], a)
+            ax.plot(df_t["Log(J)"], df_t["Potential (V vs RHE)"], "o", ms=4, color=m["mau"])
+            xx = np.array([df_t["Log(J)"].min(), df_t["Log(J)"].max()])
+            ax.plot(xx, a_s * xx + b_i, "-", lw=1.8, color=m["mau"], label=f"{m['nhan']} ({slope:.1f} mV/dec)")
         ax.set_xlabel("Log(J)")
-        ax.set_ylabel("Potential (V vs RHE)")
+        ax.set_ylabel(NHAN_POT)
         hoan_thien(fig, ax, goc + ".png", legend=True)
     else:
         fig, ax = plt.subplots(figsize=FIG)
@@ -438,7 +469,7 @@ def bang_so_sanh(loai, muc, a):
             them(f"{m['nhan']} | {NHAN_I}", i)
     elif loai == "TAFEL":
         for m in muc:
-            df_t, slope, _, _ = xu_ly_tafel(m["d"], a.tafel_min, a.tafel_max, ten=m["nhan"])
+            df_t, slope, _, _ = tafel_a(m["d"], a, ten=m["nhan"])
             them(f"{m['nhan']} | Log(J)", df_t["Log(J)"].to_numpy())
             them(f"{m['nhan']} | Potential (V vs RHE)", df_t["Potential (V vs RHE)"].to_numpy())
     else:
@@ -462,7 +493,11 @@ def tinh_ecsa(files, a, e_chon, cs, chu_ky, goc_ra, ve=True):
     plt = _plt() if ve else None
     fig, ax = plt.subplots(figsize=FIG) if ve else (None, None)
     
+    bo_qua = {os.path.normcase(os.path.abspath(x)) for x in (getattr(a, "ecsa_bo_qua", None) or [])}
     for k, p in enumerate(files):
+        if os.path.normcase(os.path.abspath(p)) in bo_qua:
+            print(f"  bo qua {os.path.basename(p)} (nguoi dung bo tick khoi ECSA)")
+            continue
         tho, _ = doc_file_tho(p)
         d, loai = xu_ly_cv_lsv(tho, a)
         if loai != "CV":
@@ -477,7 +512,7 @@ def tinh_ecsa(files, a, e_chon, cs, chu_ky, goc_ra, ve=True):
             ax.plot(g[COT_E], g[COT_I], lw=1.4, label=f"{v_rate:.0f} mV/s")
 
     if len(cac) < 2:
-        raise ValueError("ECSA can it nhat 2 file CV o 2 toc do quet khac nhau")
+        raise ValueError("ECSA can it nhat 2 file CV o 2 toc do quet khac nhau (sau khi bo cac file da bo tick)")
 
     if ve:
         ax.set_xlabel(NHAN_E)
@@ -529,6 +564,32 @@ def tinh_ecsa(files, a, e_chon, cs, chu_ky, goc_ra, ve=True):
     return b, he_so, tung, r2, e_chon, kq
 
 
+def xuat_cv_json(files, a, chu_ky, duong):
+    """Ghi dữ liệu CV (chu kỳ được chọn) ra JSON cho cửa sổ ECSA tương tác của giao diện."""
+    import json
+    ra = []
+    for k, p in enumerate(files):
+        try:
+            tho, _ = doc_file_tho(p)
+            d, loai = xu_ly_cv_lsv(tho, a)
+        except Exception as e:
+            print(f"  bo qua {os.path.basename(p)}: {e}")
+            continue
+        if loai != "CV":
+            print(f"  bo qua {os.path.basename(p)} (khong phai CV)")
+            continue
+        ck = chon_chu_ky(d, chu_ky)
+        g = d[d["chu_ky"] == ck]
+        nhan = a.nhan[k] if getattr(a, "nhan", None) and k < len(a.nhan) and a.nhan[k] else os.path.splitext(os.path.basename(p))[0]
+        mau = a.mau_file[k] if getattr(a, "mau_file", None) and k < len(a.mau_file) and a.mau_file[k] else BANG_MAU[k % len(BANG_MAU)]
+        ra.append({"path": os.path.abspath(p), "nhan": nhan, "mau": mau, "v": float(toc_do_quet(d) * 1000), "chu_ky": int(ck),
+                   "e": [float(x) for x in g[COT_E]], "i": [float(x) for x in g[COT_I]],
+                   "a": [1 if h == "anodic" else 0 for h in g["huong_quet"]]})
+    with open(duong, "w", encoding="utf-8") as f:
+        json.dump({"cv": ra}, f)
+    print(f"  da xuat {len(ra)} duong CV: {duong}")
+
+
 # ====================== THAM SỐ DÒNG LỆNH ======================
 def them_tham_so_chung(ap):
     ap.add_argument("files", nargs="+")
@@ -546,6 +607,8 @@ def them_tham_so_chung(ap):
     ap.add_argument("--noi-tiep", action="store_true")
     ap.add_argument("--ecsa", action="store_true")
     ap.add_argument("--e-ecsa", type=float, default=None)
+    ap.add_argument("--ecsa-bo-qua", action="append", default=[], help="file CV bỏ khỏi ECSA (có thể lặp lại)")
+    ap.add_argument("--xuat-cv-json", default=None, help="chỉ ghi dữ liệu CV ra JSON (cho cửa sổ ECSA tương tác)")
     ap.add_argument("--cs", type=float, default=CS_MAC_DINH)
     ap.add_argument("--tafel-min", type=float, default=9.0)
     ap.add_argument("--tafel-max", type=float, default=11.0)
@@ -554,9 +617,72 @@ def them_tham_so_chung(ap):
     ap.add_argument("--bao-cao", default=None, help="thu muc de xuat bao_cao_tong_hop.xlsx (bo trong = khong xuat)")
     ap.add_argument("--i-muc-tieu", default="10", help="cac mat do dong muc tieu (mA/cm2) cho bao cao, cach nhau dau phay")
     ap.add_argument("--e-can-bang", type=float, default=1.23, help="dien the can bang (V) de tinh qua the trong bao cao")
+    ap.add_argument("--tafel-e-min", type=float, default=None, help="vung Tafel theo dien the (V): can ca --tafel-e-min va --tafel-e-max")
+    ap.add_argument("--tafel-e-max", type=float, default=None)
+    ap.add_argument("--khong-rhe", action="store_true", help="khong quy doi sang RHE (dien the te bao 2 dien cuc)")
+    ap.add_argument("--khong-qua-the", action="store_true", help="khong tinh qua the (vd oxi hoa glucose): xep hang theo dien the")
+    ap.add_argument("--nhom", action="append", default=[], help="ten nhom lap lai cua tung file (cung thu tu file)")
+    ap.add_argument("--fe-v-h2", default=None, help="the tich khi thu duoc (mL) cua tung mau IT, cach nhau dau phay")
+    ap.add_argument("--fe-nhiet-do", type=float, default=25.0)
+    ap.add_argument("--fe-ap-suat", type=float, default=101.325, help="kPa")
+    ap.add_argument("--fe-n", type=float, default=2.0, help="so electron (H2: 2, O2: 4)")
+    ap.add_argument("--fe-khong-hoi-nuoc", action="store_true")
+    ap.add_argument("--fit-eis", action="store_true", help="fit EIS bang mach Rs + (Rct // CPE)")
+    ap.add_argument("--tai-lieu", default=None, help="file CSV cac nghien cuu khac de so sanh")
+    ap.add_argument("--tof-cv", action="store_true", help="tinh TOF = |I|/(n F N), N = Q/(n F), Q = dien tich CV / toc do quet")
+    ap.add_argument("--tof-e-min", type=float, default=None)
+    ap.add_argument("--tof-e-max", type=float, default=None)
+    ap.add_argument("--tof-n", type=float, default=2.0, help="so electron trao doi trong cong thuc TOF")
+    ap.add_argument("--qs-tof", action="store_true", help="cong cu Qs-LSV + TOF: file CV -> N; thu muc Qs-LSV -> I theo E")
+    ap.add_argument("--qs-thu-muc", default=None, help="thu muc chung chua file Qs-LSV (tu ghep theo ten mau)")
+    ap.add_argument("--qs-lsv", action="append", default=[], help="Qs-LSV cua tung file CV theo thu tu (thu muc hoac file; nhieu muc cach nhau '|'; rong = ghep tu dong)")
+    ap.add_argument("--qs-nguong", type=float, default=3.0, help="mV: E nhay qua nguong nay = buoc dien the moi")
+    ap.add_argument("--qs-duoi", type=float, default=0.0, help="%% diem cuoi cua moi buoc de lay trung binh (0 = diem cuoi cung)")
+    ap.add_argument("--qs-dung-tho", action="store_true", help="dung dong tho (A) thay cho dong da quy doi (mA/cm2)")
+    ap.add_argument("--qs-da-rhe", action="store_true", help="E trong file Qs-LSV da la RHE (khong cong pH, Eref)")
+    ap.add_argument("--tof-n-q", type=float, default=None, help="so electron khi tinh N = Q/(n F); bo trong = bang --tof-n")
+    ap.add_argument("--tof-v", default=None, help="toc do quet (mV/s) de tinh Q; 1 so chung hoac moi mau 1 so (cach nhau dau ;); bo trong = lay tu du lieu")
+    ap.add_argument("--tof-dien-tich", default="kin", choices=["kin", "tong"], help="kin = |tich phan vong kin I dE|; tong = tich phan |I||dE| hai chieu")
+    ap.add_argument("--tof-chieu", default="ca_hai", choices=["ca_hai", "catot", "anot"], help="chieu quet dung de ve TOF")
+    ap.add_argument("--tof-rhe", action="store_true", help="loc cua so theo dien the da quy doi RHE (mac dinh: dien the trong file)")
+    ap.add_argument("--hinh-bai-bao", action="store_true", help="xuat hinh ghep nhieu o chuan bai bao")
+    ap.add_argument("--hinh-cot", type=int, default=2, help="1 = cot don (8.6 cm), 2 = cot doi (17.8 cm)")
+    ap.add_argument("--hinh-dang", default="png,pdf,tiff")
+    ap.add_argument("--hinh-dpi", type=int, default=600)
+    ap.add_argument("--hinh-o", action="append", default=None,
+                    help="cac o cua MOT hinh theo thu tu (A,B,C...): lsv,tafel,eis,it,cot; lap lai de tao nhieu hinh; bo trong = tu chon")
+    ap.add_argument("--nhan-hinh", action="append", default=[], help="ten mau rieng trong hinh bai bao (theo thu tu file; rong = dung nhan goc)")
+    ap.add_argument("--hinh-chu", default="hoa", choices=["hoa", "thuong"], help="(A) hay (a)")
+    ap.add_argument("--pho-kieu", default="xrd", help="xrd | raman | xps | ftir | khac")
+    ap.add_argument("--pho-doi", type=float, default=1.1, help="khoang doi giua cac pho khi xep chong")
+    ap.add_argument("--pho-dinh", type=int, default=0, help="so dinh danh dau tren moi pho")
+    ap.add_argument("--pho-khong-chuan-hoa", action="store_true")
+    ap.add_argument("--pho-x-min", type=float, default=None)
+    ap.add_argument("--pho-x-max", type=float, default=None)
+    ap.add_argument("--pho-nhan-x", default=None)
+    ap.add_argument("--thu-muc-tong-hop", default=None, help="thu muc chua cac ket qua tong hop (so sanh, FE, fit EIS, hinh bai bao)")
+    ap.add_argument("--r-s", type=float, default=0.0, help="dien tro dung dich Rs (ohm) de bu iR; 0 = khong bu")
+    ap.add_argument("--ir-phan-tram", type=float, default=100.0, help="phan tram iR duoc bu (mac dinh 100)")
+    ap.add_argument("--so-sanh", action="store_true", help="xuat bang + bieu do so sanh cac mau (can thu-muc-ra)")
+    ap.add_argument("--qua-the-ht", default="300", help="cac qua the khao sat (mV) de tinh hoat do khoi/TOF, cach nhau dau phay")
+    ap.add_argument("--tai-trong", default=None, help="tai trong xuc tac (mg/cm2) -> hoat do khoi (A/g)")
+    ap.add_argument("--so-mol-tam", default=None, help="so tam hoat dong (umol/cm2) -> TOF")
+    ap.add_argument("--khoi-luong-mol", default=None, help="khoi luong mol M (g/mol) de uoc tinh so tam tu tai trong")
+    ap.add_argument("--ti-le-tam", default="1", help="ti le nguyen tu hoat dong (0-1) khi tinh so tam tu tai trong")
+    ap.add_argument("--n-e", default="4", help="so electron cho moi phan tu san pham (OER 4, HER 2)")
+
+
+def ap_dung_che_do(a):
+    """Nhan truc theo che do (RHE / dien the te bao)."""
+    global NHAN_E, NHAN_POT
+    if getattr(a, "khong_rhe", False):
+        NHAN_E, NHAN_POT = "Cell voltage (V)", "Cell voltage (V)"
+    else:
+        NHAN_E, NHAN_POT = "E (V vs. RHE)", "Potential (V vs RHE)"
 
 
 def khoi_dong_canh_bao(a):
+    ap_dung_che_do(a)
     if canh_bao:
         canh_bao.reset()
         canh_bao.dat_im_lang(getattr(a, "khong_canh_bao", False))
@@ -565,6 +691,16 @@ def khoi_dong_canh_bao(a):
 
 
 def kiem_tra_cac_muc(muc, a):
+    r_s = float(getattr(a, "r_s", 0.0) or 0.0)
+    if r_s and canh_bao:
+        pt = float(getattr(a, "ir_phan_tram", 100.0))
+        for m in muc:
+            if m["loai"] in ("CV", "LSV", "TAFEL"):
+                dmax = float(np.abs(m["d"]["i (A/cm2)"]).max()) * r_s * pt / 100.0 * 1000
+                canh_bao.them(canh_bao.LUU_Y, f"đã bù iR với Rs = {r_s:g} Ω ({pt:g}%): E dịch tối đa {dmax:.0f} mV ở dòng lớn nhất. "
+                              "Hãy chắc chắn Rs lấy từ EIS đo ở cùng điều kiện.", m["nhan"])
+                if dmax > 300:
+                    canh_bao.them(canh_bao.CANH_BAO, f"mức bù iR rất lớn ({dmax:.0f} mV): kiểm tra lại Rs (đơn vị Ω) và hệ số nhân/chia dòng.", m["nhan"])
     if canh_bao:
         for m in muc:
             try:
@@ -573,8 +709,50 @@ def kiem_tra_cac_muc(muc, a):
                 print(f"  (canh bao) khong kiem tra duoc {m.get('nhan', '')}: {e}")
 
 
+def thu_tong_hop(a):
+    return getattr(a, "thu_muc_tong_hop", None) or getattr(a, "bao_cao", None) or getattr(a, "thu_muc_ra", None)
+
+
 def ket_thuc(a, ds, muc=None):
-    """Xuất báo cáo Excel (nếu được yêu cầu) và tổng kết cảnh báo."""
+    """Xuất bảng so sánh, FE, fit EIS + báo cáo Excel (nếu được yêu cầu) và tổng kết cảnh báo."""
+    thu_ra = thu_tong_hop(a)
+    if thu_ra and getattr(a, "hinh_bai_bao", False) and not getattr(a, "ecsa", False):
+        try:
+            import hinh_bai_bao
+            if muc is None:
+                muc = [nap_muc(p, a, k) for k, p in enumerate(ds)]
+            hinh_bai_bao.tao_hinh(muc, a, thu_ra)
+        except Exception as e:
+            print(f"  (canh bao) khong tao duoc hinh bai bao: {e}")
+    if thu_ra and getattr(a, "tof_cv", False) and not getattr(a, "ecsa", False):
+        try:
+            import tof_cv
+            if muc is None:
+                muc = [nap_muc(p, a, k) for k, p in enumerate(ds)]
+            tof_cv.chay(muc, a, thu_ra, ve=not getattr(a, "da_ve_tof_origin", False))
+        except Exception as e:
+            print(f"  (canh bao) khong tinh duoc TOF tu CV: {e}")
+    if thu_ra and not getattr(a, "ecsa", False) and (getattr(a, "fe_v_h2", None) or getattr(a, "fit_eis", False)):
+        try:
+            if muc is None:
+                muc = [nap_muc(p, a, k) for k, p in enumerate(ds)]
+            if getattr(a, "fe_v_h2", None):
+                import hieu_suat
+                hieu_suat.xuat_fe(muc, a, thu_ra)
+            if getattr(a, "fit_eis", False):
+                import fit_eis
+                fit_eis.xuat_fit(muc, a, thu_ra)
+        except Exception as e:
+            print(f"  (canh bao) khong hoan thanh FE/fit EIS: {e}")
+    if getattr(a, "so_sanh", False) and thu_tong_hop(a):
+        try:
+            import so_sanh
+            if muc is None and not getattr(a, "ecsa", False):
+                muc = [nap_muc(p, a, k) for k, p in enumerate(ds)]
+            if muc:
+                so_sanh.xuat_so_sanh(muc, a, thu_tong_hop(a))
+        except Exception as e:
+            print(f"  (canh bao) khong tao duoc bang so sanh: {e}")
     if getattr(a, "bao_cao", None) and bao_cao:
         try:
             duong = bao_cao.xuat(a, ds, a.bao_cao)
@@ -607,8 +785,27 @@ def main():
     ap.add_argument("--khong-ve", action="store_true")
     a = ap.parse_args()
     ds = mo_rong_file(a.files)
+    mat = [p for p in ds if not os.path.isfile(p)]
+    if mat:
+        print("[LOI] Khong tim thay file (da doi ten/di chuyen, hoac o dia/USB chua cam):")
+        for p in mat:
+            print("   - " + p)
+        sys.exit(2)
     khoi_dong_canh_bao(a)
 
+    if (a.loai or "").upper() == "PHO":
+        import pho_xy
+        pho_xy.chay(ds, a)
+        return
+    if getattr(a, "qs_tof", False):
+        import qs_lsv
+        a.chong = False
+        muc = [nap_muc(p, a, k) for k, p in enumerate(ds)]
+        qs_lsv.chay(muc, a, a.thu_muc_ra or os.path.dirname(os.path.abspath(ds[0])), ve=not a.khong_ve)
+        return
+    if getattr(a, "xuat_cv_json", None):
+        xuat_cv_json(ds, a, a.chu_ky, a.xuat_cv_json)
+        return
     if a.ecsa:
         goc = goc_ra(a, ds[0])
         tinh_ecsa(ds, a, a.e_ecsa, a.cs, a.chu_ky, goc, ve=not a.khong_ve)
