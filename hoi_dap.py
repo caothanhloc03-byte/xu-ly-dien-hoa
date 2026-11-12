@@ -22,6 +22,7 @@ GOI_Y = """Bạn có thể hỏi (có dấu hoặc không dấu đều được)
   • ecsa / ecsa cs 0.04 tại 1.0 V          → Cdl và ECSA từ các file CV
   • dòng lớn nhất / dòng trung bình từ 1.4 đến 1.9 V   → thống kê một đoạn E
   • dòng trung bình từ 0 đến 2 giờ         → thống kê một đoạn thời gian (file IT)
+  • hướng dẫn LSV / cách làm tafel / các bước ecsa   → các bước làm trong app, công thức, tiêu chí (bản có tick: tab Trợ giúp)
 Thêm tên mẫu hoặc "file 2" để chỉ hỏi mẫu đó; không nói gì thì hỏi tất cả các file."""
 
 
@@ -271,6 +272,15 @@ def tra_loi(cau_hoi, nc):
     q = chuan_hoa(cau_hoi).strip()
     if not q:
         return GOI_Y
+    if re.search(r"\b(?:huong dan|cach (?:lam|do|dung|su dung|tinh|ve)|cac buoc|lam sao|lam the nao|buoc nao|tieu chi)\b", q):
+        try:
+            import huong_dan_phep_do as _hd
+            ds = _hd.tim_trong_cau(q)
+            if ds:
+                return _hd.van_ban(ds[0]) + ("\n\n(Xem thêm: " + ", ".join(_hd.THEO_ID[i]["ten"].split(":")[0] for i in ds[1:3]) + ")" if len(ds) > 1 else "") + \
+                    "\n\nMở bản có tick từng bước: tab Trợ giúp ▸ 'Hướng dẫn theo phép đo'."
+        except Exception:
+            pass
     if not nc.files:
         return "Chưa chọn file số liệu nào (mục 1)."
     ds, da_chi_dinh = chon_file(q, nc)

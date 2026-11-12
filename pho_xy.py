@@ -19,6 +19,7 @@ KIEU = {
 
 
 def doc_xy(duong_dan):
+    ext = os.path.splitext(duong_dan)[1].lower()
     x, y = [], []
     with open(duong_dan, "r", encoding="utf-8", errors="ignore") as f:
         for d in f:

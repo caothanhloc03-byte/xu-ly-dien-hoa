@@ -20,9 +20,10 @@ MAU_LOI = [
      "Cài bằng:  python -m pip install originpro  (cần Windows + Origin 2021 trở lên, khuyến nghị 2022+). Với bản exe, build lại bằng build.bat. "
      "Nếu không có Origin, bỏ tick 'Vẽ bằng Origin' và chỉ dùng 'Xuất CSV & Ảnh Matplotlib'."),
     (r"com_error|pywintypes|Failed to (start|connect)|could not (start|connect)|RPC server|OriginExt",
-     "Không kết nối được Origin.",
-     "Mở Origin một lần cho đến khi thấy giao diện chính (đóng hộp thoại kích hoạt/cập nhật nếu có), "
-     "đóng các hộp thoại đang mở rồi chạy lại. Kiểm tra bản quyền Origin còn hạn và Origin là bản 2022 trở lên (originpro cần Origin 2021 trở lên)."),
+     "Không kết nối/điều khiển được Origin.",
+     "Thường do: máy này chưa cài hoặc chưa kích hoạt Origin; Origin cũ hơn 2021 (originpro cần 2021 trở lên); Origin và app chạy khác quyền "
+     "(một bên 'Run as administrator'); Origin đang mở hộp thoại kích hoạt/cập nhật. Cách xử lý: mở Origin trước và đợi đến khi thấy giao diện chính, "
+     "đóng mọi hộp thoại rồi chạy lại. Máy không có Origin thì bỏ tick 'Vẽ bằng Origin' và dùng 'Xuất CSV & ảnh Matplotlib' (vẫn có đủ CSV và hình)."),
     (r"UnicodeEncodeError|UnicodeDecodeError",
      "Lỗi mã hóa ký tự tiếng Việt.",
      "Bấm 'Kiểm tra cập nhật' để lấy bản mới nhất. Nếu vẫn lỗi, tên file/thư mục có thể chứa ký tự lạ: thử đổi sang tên đơn giản."),

@@ -8,7 +8,7 @@ python -m PyInstaller --noconfirm --clean --onedir --name DienHoaOrigin --icon l
   --collect-all originpro --collect-all OriginExt --collect-all tkinterdnd2 ^
   --hidden-import win32com.client --hidden-import pythoncom --hidden-import openpyxl ^
   --hidden-import matplotlib.backends.backend_pdf --hidden-import matplotlib.backends.backend_svg --hidden-import matplotlib.backends.backend_agg ^
-  --hidden-import PIL.TiffImagePlugin ^
+  --hidden-import PIL.TiffImagePlugin --hidden-import matplotlib.backends.backend_tkagg --hidden-import PIL.ImageTk ^
   launcher.py || goto loi
 echo === Chep ma nguon vao dist\DienHoaOrigin\ma_nguon ===
 set OUT=dist\DienHoaOrigin\ma_nguon

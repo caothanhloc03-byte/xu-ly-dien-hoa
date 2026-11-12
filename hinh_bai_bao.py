@@ -21,6 +21,8 @@ CM = 1 / 2.54
 RONG_1_COT = 8.6 * CM        # cột đơn (~ 8.6 cm)
 RONG_2_COT = 17.8 * CM       # cột đôi (~ 17.8 cm)
 ALL_O = ("lsv", "tafel", "eis", "it", "cot")
+# kiểu chữ/nét đang dùng (đặt lại ở đầu mỗi hình theo mẫu tạp chí); mặc định = quy cách cũ
+ST = {"tick": 8, "nhan": 9, "ct": 7, "nhan_o": 11, "lw": 1.5, "khung": 1.0}
 
 
 def _plt():
@@ -40,32 +42,32 @@ def _plt():
     return plt
 
 
-def _khung(ax, co=8):
+def _khung(ax, co=None):
     ax.minorticks_on()
-    ax.tick_params(which="major", length=3.5, labelsize=co, top=False, right=False)
-    ax.tick_params(which="minor", length=2, top=False, right=False)
+    ax.tick_params(which="major", length=3.5, labelsize=co or ST["tick"], width=ST["khung"], top=False, right=False)
+    ax.tick_params(which="minor", length=2, width=ST["khung"] * 0.8, top=False, right=False)
     for s in ax.spines.values():
-        s.set_linewidth(1.0)
+        s.set_linewidth(ST["khung"])
 
 
 def _chu_o(ax, chu, kieu="hoa"):
     if kieu == "thuong":
         chu = chu.lower()
-    ax.text(-0.02, 1.03, f"({chu})", transform=ax.transAxes, fontsize=11, fontweight="bold", va="bottom", ha="left")
+    ax.text(-0.02, 1.03, f"({chu})", transform=ax.transAxes, fontsize=ST["nhan_o"], fontweight="bold", va="bottom", ha="left")
 
 
 def _o_lsv(ax, muc, a):
     for m in muc:
         x, y = xl.duong_cv_lsv(m, getattr(a, "chu_ky", None))
-        ax.plot(x, y, lw=1.5, color=m["mau"], label=m["nhan"])
+        ax.plot(x, y, lw=ST["lw"], color=m["mau"], label=m["nhan"])
     try:
         j = float(str(getattr(a, "i_muc_tieu", "10")).replace(";", ",").split(",")[0])
-        ax.axhline(j, color="0.45", lw=0.8, ls="--")
+        ax.axhline(j, color="0.45", lw=min(0.8, ST["lw"]), ls="--")
     except ValueError:
         pass
-    ax.set_xlabel(xl.NHAN_E, fontsize=9)
-    ax.set_ylabel(xl.NHAN_I, fontsize=9)
-    ax.legend(fontsize=7, frameon=False, loc="upper left")
+    ax.set_xlabel(xl.NHAN_E, fontsize=ST["nhan"])
+    ax.set_ylabel(xl.NHAN_I, fontsize=ST["nhan"])
+    ax.legend(fontsize=ST["ct"], frameon=False, loc="upper left")
 
 
 def _o_tafel(ax, muc, a):
@@ -76,10 +78,10 @@ def _o_tafel(ax, muc, a):
             continue
         ax.plot(df["Log(J)"], df["Potential (V vs RHE)"], "o", ms=2.5, color=m["mau"])
         xx = np.array([df["Log(J)"].min(), df["Log(J)"].max()])
-        ax.plot(xx, a_s * xx + b, "-", lw=1.4, color=m["mau"], label=f"{m['nhan']} ({abs(slope):.0f} mV dec$^{{-1}}$)")
-    ax.set_xlabel("log |J| (mA cm$^{-2}$)", fontsize=9)
-    ax.set_ylabel(xl.NHAN_POT, fontsize=9)
-    ax.legend(fontsize=7, frameon=True, framealpha=0.85, edgecolor="none", loc="best")
+        ax.plot(xx, a_s * xx + b, "-", lw=ST["lw"], color=m["mau"], label=f"{m['nhan']} ({abs(slope):.0f} mV dec$^{{-1}}$)")
+    ax.set_xlabel("log |J| (mA cm$^{-2}$)", fontsize=ST["nhan"])
+    ax.set_ylabel(xl.NHAN_POT, fontsize=ST["nhan"])
+    ax.legend(fontsize=ST["ct"], frameon=True, framealpha=0.85, edgecolor="none", loc="best")
 
 
 def _o_eis(ax, muc, a):
@@ -93,21 +95,21 @@ def _o_eis(ax, muc, a):
         if fit_eis:
             try:
                 r = fit_eis.fit(d["f (Hz)"], d["Z' (ohm)"], d["-Z'' (ohm)"])
-                ax.plot(*r["_duong_fit"], "-", lw=1.2, color=m["mau"])
+                ax.plot(*r["_duong_fit"], "-", lw=ST["lw"] * 0.85, color=m["mau"])
             except Exception:
                 pass
-    ax.set_xlabel("Z' (Ω)", fontsize=9)
-    ax.set_ylabel("−Z'' (Ω)", fontsize=9)
+    ax.set_xlabel("Z' (Ω)", fontsize=ST["nhan"])
+    ax.set_ylabel("−Z'' (Ω)", fontsize=ST["nhan"])
     ax.set_aspect("equal", adjustable="datalim")
-    ax.legend(fontsize=7, frameon=True, framealpha=0.85, edgecolor="none", loc="best")
+    ax.legend(fontsize=ST["ct"], frameon=True, framealpha=0.85, edgecolor="none", loc="best")
 
 
 def _o_it(ax, muc, a):
     for m, t, i in xl.duong_it(muc, getattr(a, "noi_tiep", False)):
-        ax.plot(t, i, lw=1.3, color=m["mau"], label=m["nhan"])
-    ax.set_xlabel("Time (h)", fontsize=9)
-    ax.set_ylabel(xl.NHAN_I, fontsize=9)
-    ax.legend(fontsize=7, frameon=False, loc="best")
+        ax.plot(t, i, lw=ST["lw"], color=m["mau"], label=m["nhan"])
+    ax.set_xlabel("Time (h)", fontsize=ST["nhan"])
+    ax.set_ylabel(xl.NHAN_I, fontsize=ST["nhan"])
+    ax.legend(fontsize=ST["ct"], frameon=False, loc="best")
 
 
 def _o_cot(ax, muc, a):
@@ -121,12 +123,12 @@ def _o_cot(ax, muc, a):
     if cot not in df:
         cot, nhan_y = f"E tại {j:g} mA/cm² (V)", f"E @ {j:g} mA cm$^{{-2}}$ (V)"
     v = df[cot].astype(float).fillna(0).to_numpy()
-    ax.bar(range(len(v)), v, color=list(df["_mau"]), edgecolor="black", linewidth=0.8, width=0.65)
+    ax.bar(range(len(v)), v, color=list(df["_mau"]), edgecolor="black", linewidth=min(0.8, ST["lw"]), width=0.65)
     for k, x in enumerate(v):
-        ax.text(k, x, f"{x:.3g}", ha="center", va="bottom", fontsize=7)
+        ax.text(k, x, f"{x:.3g}", ha="center", va="bottom", fontsize=ST["tick"])
     ax.set_xticks(range(len(v)))
-    ax.set_xticklabels([str(x) for x in df["Nhãn"]], rotation=30, ha="right", fontsize=7)
-    ax.set_ylabel(nhan_y, fontsize=9)
+    ax.set_xticklabels([str(x) for x in df["Nhãn"]], rotation=30, ha="right", fontsize=ST["tick"])
+    ax.set_ylabel(nhan_y, fontsize=ST["nhan"])
     ax.set_ylim(0, max(v.max(), 1e-9) * 1.18)
     ax.minorticks_off()
 
@@ -184,7 +186,13 @@ def tao_hinh(muc, a, thu_muc):
 
 
 def _tao_mot(muc, a, thu_muc, yeu_cau, ten_file):
+    import hinh_tap_chi as htc
     plt = _plt()
+    mt = htc.mau(getattr(a, "hinh_tap_chi", None) or "Tùy chỉnh")
+    ST.clear()
+    ST.update(htc.kieu_chu(mt))
+    plt.rcParams["axes.linewidth"] = ST["khung"]
+    plt.rcParams["xtick.major.width"] = plt.rcParams["ytick.major.width"] = ST["khung"]
     ds_o = chon_o(muc, yeu_cau)
     if not ds_o:
         print("  (canh bao) khong co du lieu phu hop de ghep hinh bai bao.")
@@ -198,26 +206,31 @@ def _tao_mot(muc, a, thu_muc, yeu_cau, ten_file):
         return []
     n = len(ds_o)
     rong_cot = int(getattr(a, "hinh_cot", 2) or 2)
+    w = htc.rong_cm(mt, rong_cot) * CM
     if rong_cot == 1:
-        w, hang, cot = RONG_1_COT, n, 1
+        hang, cot = n, 1
         h = 2.5 * hang
     else:
-        w = RONG_2_COT
         cot = 1 if n == 1 else (2 if n <= 4 else 3)
         hang = math.ceil(n / cot)
         h = (w / cot) * 0.8 * hang
+    cao_max = mt["cao"] * CM
+    if h > cao_max:           # không vượt chiều cao tối đa của tạp chí: thu thấp các ô
+        print(f"  (luu y) hinh cao {h / CM:.1f} cm vuot toi da {mt['cao']} cm cua {mt['ten']}: da thu thap cac o cho vua.")
+        h = cao_max
     fig, axs = plt.subplots(hang, cot, figsize=(w, h), squeeze=False)
     ham = {"lsv": _o_lsv, "tafel": _o_tafel, "eis": _o_eis, "it": _o_it, "cot": _o_cot}
+    kieu_chu_o = mt["chu_o"] or getattr(a, "hinh_chu", "hoa")
     for k, ten in enumerate(ds_o):
         ax = axs[k // cot][k % cot]
         ham[ten](ax, nhom[ten], a)
         _khung(ax)
-        _chu_o(ax, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[k % 26], getattr(a, "hinh_chu", "hoa"))
+        _chu_o(ax, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[k % 26], kieu_chu_o)
     for k in range(n, hang * cot):
         axs[k // cot][k % cot].axis("off")
     fig.tight_layout(w_pad=1.2, h_pad=1.2)
     os.makedirs(thu_muc, exist_ok=True)
-    dpi = int(getattr(a, "hinh_dpi", 600) or 600)
+    dpi = int(getattr(a, "hinh_dpi", 0) or 0) or mt["dpi"]
     ra = []
     for dang in [x.strip().lower() for x in str(getattr(a, "hinh_dang", "png,pdf,tiff")).replace(";", ",").split(",") if x.strip()]:
         ext = {"tif": "tiff", "jpeg": "jpg"}.get(dang, dang)
@@ -233,6 +246,17 @@ def _tao_mot(muc, a, thu_muc, yeu_cau, ten_file):
         except Exception as e:
             print(f"  (canh bao) khong luu duoc {ext}: {e}")
     plt.close(fig)
+    kt = htc.kiem_chuan(mt, ST, w / CM, h / CM, dpi, ())
+    try:
+        p_kt = os.path.join(thu_muc, f"{ten_file}_kiem_tra_tap_chi.txt")
+        with open(p_kt, "w", encoding="utf-8") as f:
+            f.write(f"ĐỐI CHIẾU QUY CÁCH TẠP CHÍ: {mt['ten']}\n")
+            f.write("\n".join(f"[{tt}] {nd}" for tt, nd in kt) + "\n\n" + "\n".join(mt["ghi_chu"]) + ("\nNguồn: " + mt["nguon"] if mt["nguon"] else "") + "\n")
+    except OSError:
+        pass
+    for tt, nd in kt:
+        if tt != "Đạt":
+            print(f"  (luu y) quy cach {mt['ten']}: {nd}")
     if ra:
         print(f"  hinh bai bao [{ten_file}] ({n} o: {', '.join(ds_o)}; {w / CM:.1f} cm rong; {dpi} dpi): " + ", ".join(os.path.basename(x) for x in ra))
     return ra

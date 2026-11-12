@@ -123,7 +123,8 @@ def _thong_tin(a, ds):
         ("Điện thế điện cực so sánh Eref (V)", getattr(a, "eref", "")),
         ("Hệ số nhân dòng", getattr(a, "nhan_i", "")),
         ("Hệ số chia dòng (diện tích)", getattr(a, "chia_i", "")),
-        ("Công thức E", f"E(RHE) = E + 0.0592 × {getattr(a, 'ph', '')} + {getattr(a, 'eref', '')}"),
+        ("Hệ số Nernst (V/pH)", getattr(a, "nernst", 0.0592)),
+        ("Công thức E", f"E(RHE) = E + {getattr(a, 'nernst', 0.0592):g} × {getattr(a, 'ph', '')} + {getattr(a, 'eref', '')}"),
         ("Công thức I", f"I (mA/cm²) = i × 1000 × {getattr(a, 'nhan_i', '')} ÷ {getattr(a, 'chia_i', '')}"),
         ("Loại phép đo", getattr(a, "loai", None) or "Tự nhận dạng"),
         ("Chu kỳ CV dùng", getattr(a, "chu_ky", None) or "Chu kỳ cuối (mặc định)"),
@@ -177,7 +178,7 @@ def tao_noi_dung(a, ds):
                  for k, p in enumerate(ds)]
         nc = cong_cu.NguCanh(files, a.ph, a.eref, a.nhan_i, a.chia_i, None if loai_ep == "TAFEL" else loai_ep,
                              r_s=getattr(a, "r_s", 0.0) or 0.0, ir_pct=getattr(a, "ir_phan_tram", 100.0),
-                             khong_rhe=getattr(a, "khong_rhe", False))
+                             khong_rhe=getattr(a, "khong_rhe", False), nernst=getattr(a, "nernst", 0.0592))
         nhom = {}
         for k in range(len(files)):
             try:
@@ -265,6 +266,14 @@ def xuat(a, ds, thu_muc):
     """Xuất báo cáo vào `thu_muc`. Trả về đường dẫn file đã tạo."""
     os.makedirs(thu_muc, exist_ok=True)
     sheets = tao_noi_dung(a, ds)
+    nop = getattr(a, "goi_nop_bai", False)
+    if nop:
+        try:
+            import nop_bai
+            nop_bai.tao(sheets, a, ds, thu_muc, LUU["tafel"])
+        except Exception as e:  # noqa: BLE001 - không để lỗi phần phụ làm mất báo cáo chính
+            print(f"  (canh bao) khong tao duoc goi nop bai: {e}")
+            nop = False
     try:
         import openpyxl  # noqa: F401
         duong = os.path.join(thu_muc, TEN_FILE + ".xlsx")
@@ -275,4 +284,9 @@ def xuat(a, ds, thu_muc):
         print("  (luu y) may chua co openpyxl nen xuat bao cao dang CSV (mo duoc bang Excel).")
     except PermissionError:
         raise PermissionError(f"Không ghi được {TEN_FILE}.xlsx - hãy đóng file này nếu đang mở trong Excel rồi chạy lại.")
+    if nop:
+        try:
+            nop_bai.goi_tai_lap(a, ds, thu_muc)
+        except Exception as e:  # noqa: BLE001
+            print(f"  (canh bao) khong tao duoc goi_tai_lap.zip: {e}")
     return duong

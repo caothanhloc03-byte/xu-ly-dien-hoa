@@ -41,12 +41,19 @@ nd = _nhap("nhan_dang_nhanh")
 lt = _nhap("loi_than_thien")
 md = _nhap("mau_du_lieu")
 et = _nhap("ecsa_tuong_tac")
+try:
+    import dien_cuc_so_sanh as dcss
+except Exception:                                  # thiếu file khi cập nhật dở: hộp chọn điện cực chỉ còn 'Tùy chỉnh'
+    class dcss:                                    # noqa: N801
+        TEN = ["Tùy chỉnh (tự nhập Eref)"]
+        eref_cua = staticmethod(lambda ten: None)
+        ten_theo_eref = staticmethod(lambda eref: "Tùy chỉnh (tự nhập Eref)")
 
 THU_MUC_RA_MD = os.path.join(os.path.expanduser("~"), "Documents", "DienHoa_KetQua")
 PHIEN_BAN_CAI_DAT = 3
 LOAI = ["Tự nhận dạng", "LSV", "CV", "IT", "EIS", "ECSA (nhiều file CV)", "Tafel", "Phổ (XRD / Raman / XPS)"]
 TABS = ["Dữ liệu", "Phân tích", "Hình", "Xuất", "Phổ", "Hỏi đáp", "Trợ giúp"]
-KHO_HINH = ["Cột đôi 17.8 cm", "Cột đơn 8.6 cm"]
+KHO_HINH = ["Cột đơn", "Cột 1.5", "Cột đôi"]
 KIEU_PHO = ["xrd", "raman", "xps", "ftir", "khac"]
 BANG_MAU = ["#404040", "#f03c3c", "#1a5fd8", "#2aa55a", "#ff7f0e", "#9467bd",
             "#8c564b", "#e377c2", "#17becf", "#bcbd22"]
@@ -55,7 +62,7 @@ CO_CONSOLE = 0x08000000 if os.name == "nt" else 0
 # Giá trị mặc định của mọi tùy chọn (kiểu bool -> BooleanVar, còn lại -> StringVar)
 MAC_DINH = {
     "loai": LOAI[0], "chong": True, "noi_tiep": False, "mau_chu_ky": False, "chu_ky": "",
-    "ph": "13.8", "eref": "0.098", "nhan_i": "2", "chia_i": "2.15", "e_ecsa": "", "cs": "0.040",
+    "ph": "13.8", "eref": "0.098", "nernst": "0.059", "dien_cuc_ss": "Hg/HgO (1 M KOH)  0.098 V", "nhan_i": "2", "chia_i": "2.15", "e_ecsa": "", "cs": "0.040",
     "tafel_min": "9.0", "tafel_max": "11.0", "dung_origin": True, "dung_csv": True, "template": "",
     "thu_muc_ra": THU_MUC_RA_MD, "rong": "1200", "co_chu": "22", "day_net": "2", "ti_le": "1.28",
     "day_khung": "3", "le_max": "0.5", "co_chu_td": "", "co_chu_ct": "", "vc_dai": "8", "vc_day": "",
@@ -65,18 +72,22 @@ MAC_DINH = {
     "ti_le_tam": "1", "n_e": "4", "so_sanh": True,
     "khong_rhe": False, "khong_qua_the": False, "tafel_che_do": "dong", "tafel_e_min": "", "tafel_e_max": "",
     "fe_v_h2": "", "fe_nhiet_do": "25", "fe_ap_suat": "101.325", "fe_n": "2", "fe_hoi_nuoc": True, "fit_eis": False,
-    "tai_lieu": "", "hinh_bai_bao": False, "hinh_cot": KHO_HINH[0], "hb_png": True, "hb_pdf": True, "hb_tiff": True,
-    "hinh_dpi": "600", "tof_e_min": "-1.5", "tof_e_max": "-1.1", "tof_n": "2", "tof_n_q": "2", "tof_v": "", "tof_dien_tich": "Vòng kín (∮ I dE)", "tof_rhe": False, "qs_thu_muc": "", "qs_nguong": "3", "qs_duoi": "0", "qs_da_rhe": False, "qs_origin": True, "qs_matplotlib": True,
+    "tai_lieu": "", "hinh_bai_bao": False, "hinh_cot": KHO_HINH[2], "hinh_tap_chi": "Tùy chỉnh", "hb_png": True, "hb_pdf": True, "hb_tiff": True,
+    "hinh_dpi": "", "tof_e_min": "-1.5", "tof_e_max": "-1.1", "tof_n": "2", "tof_n_q": "2", "tof_v": "", "tof_dien_tich": "Vòng kín (∮ I dE)", "tof_rhe": False, "qs_thu_muc": "", "qs_nguong": "3", "qs_duoi": "0", "qs_da_rhe": False, "qs_origin": True, "qs_matplotlib": True,
     "hinh_o": "", "hinh_chu": "(A) (B) (C)", "pho_kieu": "xrd", "pho_doi": "1.1", "pho_dinh": "0", "pho_chuan_hoa": True,
     "pho_x_min": "", "pho_x_max": "", "tab_chon": "Dữ liệu",
-    "zoom": "90", "xuat_excel": True, "i_muc_tieu": "10", "e_can_bang": "1.23",
+    "zoom": "90", "xuat_excel": True, "goi_nop_bai": True,
+    "dk_dien_ly": "", "dk_tham_chieu": "", "dk_doi_cuc": "", "dk_may_do": "", "dk_nhiet_do": "25", "dk_dien_cuc": "", "dk_muc_xt": "", "i_muc_tieu": "10", "e_can_bang": "1.23",
 }
 KHOA_KHONG_VAO_CAU_HINH = {"zoom", "thu_muc_ra", "tab_chon", "tai_lieu"}
 KHOA_CAU_HINH = [k for k in MAC_DINH if k not in KHOA_KHONG_VAO_CAU_HINH]
+KHOA_DU_AN = [k for k in MAC_DINH if k not in {"zoom", "tab_chon"}]
 TEN_MAC_DINH_CAU_HINH = "(Mặc định)"
 
 GOI_Y = {
-    "ph": "pH của dung dịch điện giải.\nE (RHE) = E đo + 0.0592 × pH + Eref.",
+    "ph": "pH của dung dịch điện giải.\nE (RHE) = E đo + (hệ số Nernst) × pH + Eref.",
+    "nernst": "Hệ số Nernst (V/pH). 0.059 khớp công thức Excel hay dùng (E + 0.059×pH + Eref); 0.0592 (chính xác 0.05916) là giá trị ở 25 °C. Chênh nhau ≈ 2.8 mV ở pH 13.8.",
+    "dien_cuc_ss": "Chọn điện cực so sánh để tự điền Eref (V so với SHE). Các số là giá trị tham khảo ~25 °C: nếu datasheet điện cực của bạn khác thì sửa trực tiếp ô Eref (hộp chọn tự về 'Tùy chỉnh').",
     "eref": "Điện thế chuẩn của điện cực so sánh so với SHE (V), ví dụ Hg/HgO 1M KOH ≈ 0.098 V.",
     "nhan_i": "Hệ số nhân dòng: I (mA/cm²) = i × 1000 × (hệ số nhân) ÷ (hệ số chia).",
     "chia_i": "Hệ số chia dòng, thường là diện tích điện cực (cm²) dùng để quy ra mật độ dòng.",
@@ -85,6 +96,8 @@ GOI_Y = {
     "cs": "Điện dung riêng Cs của bề mặt phẳng lý tưởng (mF/cm²). Thường 0.020–0.060 trong kiềm; mặc định 0.040.",
     "chu_ky": "Chu kỳ CV dùng để vẽ/tính. Để trống = chu kỳ cuối (ổn định nhất).",
     "chong": "Vẽ nhiều file cùng loại lên một hình để so sánh.",
+    "noi_tiep": "Chỉ cho i-t (cần tick vẽ chồng): các file được nối đuôi nhau theo thứ tự, thời gian cộng dồn (file sau bắt đầu ngay khi file trước kết thúc) thay vì cùng bắt đầu từ 0.",
+    "goi_nop_bai": "Kèm báo cáo Excel: Bảng nộp bài, Lặp lại (TB ± SD), Kiểm tra nộp bài, file methods_dien_hoa.txt và goi_tai_lap.zip (dữ liệu thô + kết quả + thông số).",
     "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel, ECSA, cảnh báo và thông số đã dùng.",
     "i_muc_tieu": "Các mật độ dòng mục tiêu (mA/cm²) để báo cáo điện thế/quá thế, cách nhau dấu phẩy. Ví dụ: 10, 100.",
     "e_can_bang": "Điện thế cân bằng (V vs RHE) để tính quá thế. OER: 1.23 V; HER: 0 V.",
@@ -370,7 +383,7 @@ class CongCuQsTof:
             raise ValueError("Không tìm thấy thư mục Qs-LSV chung.")
         ph, eref = a.so(a.ph, "pH"), a.so(a.eref, "Eref")
         c = a.lenh_con("xu_ly_dien_hoa.py", "--worker-csv") + [m["path"] for m in self.mau]
-        c += ["--loai", "CV", "--ph", str(ph), "--eref", str(eref), "--nhan-i", str(a.so(a.nhan_i, "hệ số nhân I", duong=True)),
+        c += ["--loai", "CV", "--ph", str(ph), "--eref", str(eref), "--nernst", str(a.so(a.nernst, "hệ số Nernst", duong=True)), "--nhan-i", str(a.so(a.nhan_i, "hệ số nhân I", duong=True)),
               "--chia-i", str(a.so(a.chia_i, "hệ số chia I", duong=True))]
         if a.chu_ky.get().strip():
             c += ["--chu-ky", str(a.so(a.chu_ky, "Chu kỳ CV", int, duong=True))]
@@ -722,6 +735,9 @@ class HopThoaiQuet:
 
 
 class App:
+    MAC_DINH = MAC_DINH
+    KHOA_DU_AN = KHOA_DU_AN
+
     def __init__(self, root, dnd=None):
         self.root = root
         self.dnd = dnd
@@ -743,6 +759,7 @@ class App:
         for k, mac in MAC_DINH.items():
             v = cd.get(k, mac)
             setattr(self, k, tk.BooleanVar(value=bool(v)) if isinstance(mac, bool) else tk.StringVar(value=str(v)))
+        self.tom_tat_tap_chi = tk.StringVar(value="")
         self.tom_tat_hinh = tk.StringVar(value="")
         self.nhan_truc_x = tk.StringVar(value="Trục X:")
         self.nhan_truc_y = tk.StringVar(value="Trục Y:")
@@ -768,9 +785,13 @@ class App:
             GoiY(e, GOI_Y[goi_y])
         return e
 
-    def nhom_ribbon(self, cha, tieu_de, hang=None):
+    def nhom_ribbon(self, cha, tieu_de, hang=None, doc=False):
+        """doc=True: xếp nhóm theo chiều dọc (trong một cột) để không bị đẩy ra ngoài cửa sổ khi ribbon hẹp."""
         lf = ttk.LabelFrame(cha, text=f" {tieu_de} ")
-        lf.pack(side="left", fill="y", padx=4, pady=3, anchor="n")
+        if doc:
+            lf.pack(side="top", fill="x", padx=4, pady=2, anchor="n")
+        else:
+            lf.pack(side="left", fill="y", padx=4, pady=3, anchor="n")
         return lf
 
     def tick(self, cha, nhan, bien, goi_y=None, **grid):
@@ -929,11 +950,20 @@ class App:
         self.o_nhap(g, "Chu kỳ CV:", self.chu_ky, 5, "chu_ky", 1, 0)
         ttk.Label(g, text="(trống = chu kỳ cuối)", foreground="#666").grid(row=1, column=2, sticky="w")
         self.tick(g, "Vẽ chồng các file cùng loại", self.chong, "chong", row=2, column=0, columnspan=3, sticky="w", padx=6)
+        self.tick(g, "Nối tiếp thời gian các đường i-t (cộng dồn)", self.noi_tiep, "noi_tiep", row=3, column=0, columnspan=3, sticky="w", padx=6)
         g = self.nhom_ribbon(tab, "Quy đổi điện thế")
-        ttk.Label(g, text="E → RHE = E + 0.0592 ×").grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=2)
-        self.o_nhap(g, "pH", self.ph, 6, "ph", 1, 0)
-        self.o_nhap(g, "+ Eref (V)", self.eref, 6, "eref", 2, 0)
-        self.tick(g, "Không quy đổi RHE (điện thế tế bào)", self.khong_rhe, "khong_rhe", row=3, column=0, columnspan=2, sticky="w", padx=6)
+        ttk.Label(g, text="E → RHE = E + k × pH + Eref").grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=2)
+        self.o_nhap(g, "k (V/pH)", self.nernst, 6, "nernst", 1, 0)
+        self.o_nhap(g, "pH", self.ph, 6, "ph", 2, 0)
+        self.o_nhap(g, "+ Eref (V)", self.eref, 6, "eref", 3, 0)
+        ttk.Label(g, text="Điện cực:").grid(row=4, column=0, sticky="e", padx=(6, 2), pady=2)
+        cb_dc = ttk.Combobox(g, textvariable=self.dien_cuc_ss, values=dcss.TEN, width=30, state="readonly")
+        cb_dc.grid(row=4, column=1, sticky="w", padx=(0, 4), pady=2)
+        GoiY(cb_dc, GOI_Y["dien_cuc_ss"])
+        cb_dc.bind("<<ComboboxSelected>>", lambda e: self.chon_dien_cuc_ss())
+        self.eref.trace_add("write", lambda *a: self.dong_bo_dien_cuc_ss())
+        self.dong_bo_dien_cuc_ss()
+        self.tick(g, "Không quy đổi RHE (điện thế tế bào)", self.khong_rhe, "khong_rhe", row=5, column=0, columnspan=2, sticky="w", padx=6)
         g = self.nhom_ribbon(tab, "Quy đổi dòng")
         ttk.Label(g, text="I (mA/cm²) = i × 1000 ×").grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=2)
         self.o_nhap(g, "nhân", self.nhan_i, 6, "nhan_i", 1, 0)
@@ -973,17 +1003,17 @@ class App:
         GoiY(e, GOI_Y["tai_lieu"])
         ttk.Button(g, text="Chọn...", width=7, command=self.chon_tai_lieu).grid(row=2, column=1, padx=2)
         ttk.Button(g, text="Tạo file mẫu", command=self.tao_mau_tai_lieu).grid(row=2, column=2, padx=2)
-        g = self.nhom_ribbon(h2, "Hoạt độ khối & TOF")
-        self.o_nhap(g, "Tải trọng (mg/cm²)", self.tai_trong, 7, "tai_trong", 0, 0)
-        self.o_nhap(g, "Quá thế khảo sát (mV)", self.qua_the_ht, 9, "qua_the_ht", 0, 2)
-        self.o_nhap(g, "Tâm hoạt động (µmol/cm²)", self.so_mol_tam, 7, "so_mol_tam", 1, 0)
-        self.o_nhap(g, "n e⁻ / phân tử", self.n_e, 4, "n_e", 1, 2)
-        self.o_nhap(g, "hoặc M (g/mol)", self.khoi_luong_mol, 7, "khoi_luong_mol", 2, 0)
-        self.o_nhap(g, "tỉ lệ tâm (0–1)", self.ti_le_tam, 5, "ti_le_tam", 2, 2)
         g = self.nhom_ribbon(h2, "Qs-LSV & TOF")
         ttk.Label(g, text="Công cụ riêng: CV → N (từ Q),\nthư mục Qs-LSV → I; vẽ CV và TOF theo E", foreground="#555", justify="left").grid(
             row=0, column=0, padx=6, pady=2, sticky="w")
         ttk.Button(g, text="Mở công cụ Qs-LSV & TOF...", command=self.mo_cong_cu_qs).grid(row=1, column=0, padx=6, pady=4, sticky="w")
+        g = self.nhom_ribbon(h2, "Siêu tụ lai & Pin")
+        ttk.Label(g, text="GCD thô → Csp / mAh·g⁻¹, Ragone,\nretention, hiệu suất Coulomb; vẽ Origin", foreground="#555", justify="left").grid(
+            row=0, column=0, padx=6, pady=2, sticky="w")
+        b = ttk.Button(g, text="⚡ Mở công cụ...", command=self.mo_gcd)
+        b.grid(row=1, column=0, padx=6, pady=4, sticky="w")
+        GoiY(b, "Siêu tụ lai / Pin: nạp file GCD thô (BioLogic, CSV/TXT, CS Studio, Excel), tính điện dung riêng, dung lượng riêng, IR drop/ESR, "
+                "Ragone, retention và hiệu suất Coulomb theo chu kỳ; xuất Excel và vẽ Origin hoặc hình theo mẫu tạp chí.")
         g = self.nhom_ribbon(h2, "Hiệu suất Faraday (file IT)")
         self.o_nhap(g, "V khí (mL, mỗi mẫu IT)", self.fe_v_h2, 10, "fe_v_h2", 0, 0)
         self.o_nhap(g, "n e⁻", self.fe_n, 4, "fe_n", 0, 2)
@@ -1019,22 +1049,29 @@ class App:
             for c, (ten, nhan) in enumerate(zip(cac, ("Từ", "Đến", "Bước"))):
                 self.o_nhap(g, nhan, getattr(self, ten), 6, "khoang", r, 1 + c * 2)
         ttk.Button(g, text="Xóa (tự động)", command=self.xoa_khoang).grid(row=0, column=7, rowspan=2, padx=8)
-        g = self.nhom_ribbon(h2, "Hình ghép chuẩn bài báo")
-        self.tick(g, "Xuất hình nhiều ô (A)(B)(C)...", self.hinh_bai_bao, "hinh_bai_bao", row=0, column=0, columnspan=4, sticky="w", padx=6)
-        ttk.Label(g, text="Khổ:").grid(row=1, column=0, sticky="e", padx=(6, 2))
-        ttk.Combobox(g, textvariable=self.hinh_cot, values=KHO_HINH, state="readonly", width=16).grid(row=1, column=1, columnspan=2, sticky="w")
-        self.o_nhap(g, "dpi", self.hinh_dpi, 5, None, 1, 3)
-        for c, (nh, bien) in enumerate((("PNG", self.hb_png), ("PDF", self.hb_pdf), ("TIFF", self.hb_tiff))):
-            ttk.Checkbutton(g, text=nh, variable=bien).grid(row=2, column=c, sticky="w", padx=6)
-        ttk.Label(g, text="Chữ ô:").grid(row=3, column=0, sticky="e", padx=(6, 2))
-        cb_chu = ttk.Combobox(g, textvariable=self.hinh_chu, values=["(A) (B) (C)", "(a) (b) (c)"], state="readonly", width=12)
-        cb_chu.grid(row=3, column=1, columnspan=2, sticky="w")
-        cb_chu.bind("<<ComboboxSelected>>", lambda e: self.cap_nhat_tom_tat_hinh())
-        b = ttk.Button(g, text="Soạn hình & tên mẫu...", command=self.soan_hinh)
-        b.grid(row=4, column=0, columnspan=3, sticky="w", padx=6, pady=3)
-        GoiY(b, GOI_Y["hinh_o"])
-        ttk.Label(g, textvariable=self.tom_tat_hinh, foreground="#555", wraplength=260, justify="left").grid(
-            row=5, column=0, columnspan=4, sticky="w", padx=6)
+        self.dung_nhom_hinh_tap_chi(h2)
+
+    def dung_nhom_hinh_tap_chi(self, cha):
+        import hinh_tap_chi as htc
+        import hinh_tap_chi_gui as hg
+        g = self.nhom_ribbon(cha, "Hình ghép theo tạp chí")
+        self.tick(g, "Xuất hình nhiều ô", self.hinh_bai_bao, "hinh_bai_bao", row=0, column=0, sticky="w", padx=6)
+        cb = ttk.Combobox(g, textvariable=self.hinh_tap_chi, values=htc.TEN_MAU, state="readonly", width=11)
+        cb.grid(row=0, column=1, padx=4)
+        cc = ttk.Combobox(g, textvariable=self.hinh_cot, values=KHO_HINH, state="readonly", width=8)
+        cc.grid(row=0, column=2, padx=4)
+        for c, (bt, ten, lenh) in enumerate((("ℹ", "Xem quy cách chi tiết của tạp chí đã chọn (số đo, cỡ chữ, nguồn)", lambda: hg.mo_quy_cach(self)),
+                                             ("⚙", "Định dạng PNG/PDF/TIFF, dpi, chữ ô", lambda: hg.mo_tuy_chon(self)),
+                                             ("🧩", "Soạn hình & tên mẫu: chọn ô (LSV, Tafel, EIS, i-t, cột) cho từng hình", self.soan_hinh))):
+            b = ttk.Button(g, text=bt, width=3, command=lenh)
+            b.grid(row=0, column=3 + c, padx=2)
+            GoiY(b, ten)
+        ttk.Label(g, textvariable=self.tom_tat_tap_chi, foreground="#555").grid(row=1, column=0, columnspan=6, sticky="w", padx=6)
+        GoiY(cb, "Mẫu quy cách theo hướng dẫn tác giả: ACS, RSC, Elsevier, Nature; 'Tùy chỉnh' cho tạp chí khác (Wiley, Springer... mỗi tạp chí một khác).")
+        GoiY(cc, "Cột đơn / 1.5 cột (Elsevier, Nature) / cột đôi: bề rộng lấy theo tạp chí đã chọn.")
+        for v in (self.hinh_tap_chi, self.hinh_cot, self.hinh_dpi):
+            v.trace_add("write", lambda *a: hg.tom_tat(self))
+        hg.tom_tat(self)
 
     def dung_tab_xuat(self, tab):
         g = self.nhom_ribbon(tab, "Kết quả")
@@ -1043,21 +1080,42 @@ class App:
         ttk.Button(g, text="Chọn...", command=self.chon_thu_muc).grid(row=1, column=2, padx=6)
         self.tick(g, "Xuất CSV & ảnh Matplotlib (thư mục csv_va_anh_nhanh)", self.dung_csv, row=2, column=0, columnspan=3, sticky="w", padx=6)
         self.tick(g, "Xuất báo cáo Excel (bao_cao_tong_hop.xlsx)", self.xuat_excel, "xuat_excel", row=3, column=0, columnspan=3, sticky="w", padx=6)
+        self.tick(g, "Kèm gói nộp bài (bảng, kiểm tra, Methods, zip tái lập)", self.goi_nop_bai, "goi_nop_bai", row=4, column=0, columnspan=3, sticky="w", padx=6)
         g2 = self.nhom_ribbon(tab, "Mở nhanh")
-        for ten, lenh in (("Mở thư mục kết quả", self.mo_thu_muc), ("Mở báo cáo Excel", self.mo_bao_cao), ("Mở nhật ký", self.mo_nhat_ky)):
-            ttk.Button(g2, text=ten, command=lenh).pack(fill="x", padx=6, pady=2)
+        for bt, ten, lenh in (("📁", "Mở thư mục kết quả", self.mo_thu_muc), ("📊", "Mở báo cáo Excel (có sheet Bảng nộp bài, Kiểm tra nộp bài)", self.mo_bao_cao),
+                              ("📝", "Mở đoạn Methods tự tạo (methods_dien_hoa.txt)", lambda: self.mo_file_ra("methods_dien_hoa.txt")),
+                              ("📦", "Mở thư mục chứa gói tái lập (goi_tai_lap.zip) để đưa vào SI/Zenodo", lambda: self.mo_file_ra("goi_tai_lap.zip", thu_muc=True)),
+                              ("🧾", "Mở nhật ký", self.mo_nhat_ky)):
+            b = ttk.Button(g2, text=bt, width=4, command=lenh)
+            b.pack(side="left", padx=3, pady=2)
+            GoiY(b, ten)
+        g3 = self.nhom_ribbon(tab, "Nộp bài & dự án")
+        import nop_bai_gui as ng
+        for bt, ten, lenh in (("🧪", "Điều kiện thí nghiệm: điện ly, điện cực tham chiếu/đối, máy đo... (cho đoạn Methods, mục 7.6)", lambda: ng.mo_dieu_kien(self)),
+                              ("🏷", "Vai trò từng mẫu (chuẩn Pt/C, đối chứng, sau thử bền) và nhóm lặp lại", lambda: ng.mo_vai_tro(self)),
+                              ("✅", "Xem mức sẵn sàng nộp bài (đọc sheet 'Kiểm tra nộp bài' của lần chạy gần nhất)", lambda: ng.mo_san_sang(self)),
+                              ("💾", "Lưu dự án: cài đặt + danh sách mẫu + vai trò", lambda: ng.luu_du_an(self)),
+                              ("📂", "Mở dự án đã lưu", lambda: ng.mo_du_an(self))):
+            b = ttk.Button(g3, text=bt, width=4, command=lenh)
+            b.pack(side="left", padx=3, pady=2)
+            GoiY(b, ten)
 
     def dung_tab_pho(self, tab):
-        g = self.nhom_ribbon(tab, "Phổ XRD / Raman / XPS (chọn Loại = Phổ ở tab Dữ liệu)")
-        ttk.Label(g, text="Kiểu phổ:").grid(row=0, column=0, sticky="e", padx=(6, 2), pady=2)
-        ttk.Combobox(g, textvariable=self.pho_kieu, values=KIEU_PHO, state="readonly", width=10).grid(row=0, column=1, sticky="w")
-        self.o_nhap(g, "Khoảng đổi", self.pho_doi, 5, "pho_doi", 0, 2)
-        self.o_nhap(g, "Số đỉnh đánh dấu", self.pho_dinh, 4, "pho_dinh", 0, 4)
-        self.o_nhap(g, "x từ", self.pho_x_min, 7, None, 1, 0)
-        self.o_nhap(g, "đến", self.pho_x_max, 7, None, 1, 2)
-        self.tick(g, "Chuẩn hóa 0–1", self.pho_chuan_hoa, row=1, column=4, columnspan=2, sticky="w", padx=6)
-        ttk.Label(g, foreground="#666", text="File 2 cột (x, y). Chỉ xuất ảnh Matplotlib (PNG/PDF) + CSV; chưa tách đỉnh XPS.").grid(
-            row=2, column=0, columnspan=6, sticky="w", padx=6, pady=(2, 4))
+        g = self.nhom_ribbon(tab, "Phổ & ảnh")
+        mo_ta = (("🔬 XPS", self.mo_xps, "XPS: đọc file .vms của CasaXPS (hoặc text/Excel xuất từ Casa), hiệu chuẩn C1s = 284.8 eV, nền Shirley, fit GL(30) có ràng buộc hoá học, "
+                                         "Residual STD, xuất CSV + hình, vẽ Origin; nhận kết quả đã fit trong Casa."),
+                 ("📈 XRD", self.mo_xrd, "XRD: đọc file Excel XRD (nhiều mẫu), tìm đỉnh, đối chiếu ngân hàng phổ (JCPDS/CIF), phân biệt đỉnh mẫu/đế/bức xạ phụ/đỉnh lạ, "
+                                         "so sánh mẫu, báo cáo minh chứng, vẽ xếp chồng ra Origin."),
+                 ("🔭 HR-TEM", self.mo_hrtem, "HR-TEM: bấm vào vùng có vân mạng, FFT, chọn đốm, đo d (FFT và profile), gán pha, xuất ảnh chú thích; quét theo thành phần, kiểm chứng và gắn ImageJ."),
+                 ("🔗 Đối chiếu", self.mo_doi_chieu, "Đối chiếu chéo XRD – HR-TEM – XPS và trước/sau thử bền (tiêu chí 8.3, 9.2): tự lấy số liệu từ các công cụ đang mở hoặc nhập tay."))
+        for c, (ten, lenh, goi_y) in enumerate(mo_ta):
+            b = ttk.Button(g, text=ten, command=lenh, width=12)
+            b.grid(row=0, column=c, padx=4, pady=6)
+            GoiY(b, goi_y)
+
+    def mo_doi_chieu(self):
+        import nop_bai_gui
+        nop_bai_gui.mo_doi_chieu(self)
 
     def dung_tab_hoi_dap(self, tab):
         g = ttk.LabelFrame(tab, text=" Hỏi đáp về dữ liệu (tiếng Việt, không cần AI / Internet) ")
@@ -1078,6 +1136,13 @@ class App:
         g = self.nhom_ribbon(tab, "Trợ giúp")
         for ten, lenh in (("Hướng dẫn", self.mo_huong_dan), ("Dữ liệu mẫu", self.mo_du_lieu_mau), ("Giới thiệu", self.mo_gioi_thieu)):
             ttk.Button(g, text=ten, command=lenh).pack(side="left", padx=4, pady=4)
+        g = self.nhom_ribbon(tab, "Hướng dẫn theo phép đo")
+        self.hd_phep_do = tk.StringVar(value="")
+        ttk.Label(g, text="Gõ tên phép đo (LSV, Tafel, GCD...):").grid(row=0, column=0, columnspan=2, padx=6, pady=(4, 0), sticky="w")
+        o = ttk.Entry(g, textvariable=self.hd_phep_do, width=20)
+        o.grid(row=1, column=0, padx=6, pady=4, sticky="w")
+        o.bind("<Return>", lambda e: self.mo_huong_dan_phep_do(self.hd_phep_do.get()))
+        ttk.Button(g, text="Tra cứu", command=lambda: self.mo_huong_dan_phep_do(self.hd_phep_do.get())).grid(row=1, column=1, padx=4, pady=4)
         g = self.nhom_ribbon(tab, "Bảo trì")
         for ten, lenh in (("Mở nhật ký", self.mo_nhat_ky), ("Kiểm tra cập nhật", lambda: self.kiem_tra_cap_nhat(False))):
             ttk.Button(g, text=ten, command=lenh).pack(side="left", padx=4, pady=4)
@@ -1191,7 +1256,7 @@ class App:
                             self.so(self.chia_i, "hệ số chia I", duong=True),
                             loai if loai in ("LSV", "CV", "IT", "EIS") else None,
                             r_s=self.so_khong_am(self.r_s, "Rs"), ir_pct=self.so(self.ir_pct, "% bù iR", duong=True),
-                            khong_rhe=self.khong_rhe.get())
+                            khong_rhe=self.khong_rhe.get(), nernst=self.so(self.nernst, "hệ số Nernst", duong=True))
             for ten, bien in (("tai_trong", self.tai_trong), ("so_mol_tam", self.so_mol_tam),
                               ("khoi_luong_mol", self.khoi_luong_mol), ("ti_le_tam", self.ti_le_tam),
                               ("qua_the_ht", self.qua_the_ht), ("n_e", self.n_e), ("i_muc_tieu", self.i_muc_tieu),
@@ -1291,8 +1356,8 @@ class App:
             if n == 0:
                 messagebox.showinfo("Thông báo", "Không tìm thấy file .txt/.csv/.dat mới trong thư mục này.")
 
-    MODULE_CAN = ("xu_ly_dien_hoa", "ve_origin", "so_sanh", "cong_cu", "hoi_dap", "canh_bao", "bao_cao", "hieu_suat", "fit_eis", "hinh_bai_bao",
-                  "pho_xy", "ecsa_tuong_tac", "tof_cv", "qs_lsv", "nhan_dang_nhanh", "loi_than_thien", "mau_du_lieu", "tu_dong_cap_nhat")
+    MODULE_CAN = ("xu_ly_dien_hoa", "ve_origin", "so_sanh", "cong_cu", "hoi_dap", "canh_bao", "bao_cao", "nop_bai", "nop_bai_gui", "doi_chieu", "hinh_tap_chi", "hinh_tap_chi_gui", "hieu_suat", "fit_eis", "hinh_bai_bao",
+                  "pho_xy", "ecsa_tuong_tac", "tof_cv", "qs_lsv", "nhan_dang_nhanh", "loi_than_thien", "mau_du_lieu", "tu_dong_cap_nhat", "hrtem", "hrtem_gui", "ij_nhung", "xps", "xps_gui", "ve_xps_origin", "xrd", "xrd_ngan_hang", "xrd_gui", "ve_xrd_origin", "gcd_pin", "gcd_pin_gui", "ve_gcd_origin", "huong_dan_phep_do", "huong_dan_gui", "dien_cuc_so_sanh")
 
     def kiem_file_ma_nguon(self):
         """Báo rõ nếu thư mục ma_nguon thiếu file .py (thường do build cũ / cập nhật dở)."""
@@ -1304,6 +1369,59 @@ class App:
 
     def mo_cong_cu_qs(self):
         CongCuQsTof(self)
+
+    def mo_gcd(self):
+        try:
+            import gcd_pin_gui
+        except Exception as e:
+            messagebox.showerror("Siêu tụ/Pin", "Không mở được công cụ:\n" + str(e) +
+                                 "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file gcd_pin.py / gcd_pin_gui.py / ve_gcd_origin.py. Nếu lỗi nhắc backend_tkagg "
+                                 "thì cần bản exe mới (build lại bằng build.bat).")
+            return
+        try:
+            self.cs_gcd = gcd_pin_gui.CuaSoGcd(self.root, lambda: self.lenh_con("ve_gcd_origin.py", "--worker-gcd-origin"),
+                                               lambda: [m["path"] for m in self.muc])
+        except Exception as e:
+            messagebox.showerror("Siêu tụ/Pin", f"Lỗi khi mở công cụ: {e}")
+
+    def mo_xps(self):
+        try:
+            import xps_gui
+        except Exception as e:
+            messagebox.showerror("XPS", "Không mở được công cụ XPS:\n" + str(e) +
+                                 "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file xps.py / xps_gui.py. Nếu lỗi nhắc backend_tkagg "
+                                 "thì cần bản exe mới (build lại bằng build.bat).")
+            return
+        try:
+            self.cs_xps = xps_gui.CuaSoXps(self.root, lambda: self.lenh_con("ve_xps_origin.py", "--worker-xps-origin"))
+        except Exception as e:
+            messagebox.showerror("XPS", f"Lỗi khi mở công cụ XPS: {e}")
+
+    def mo_xrd(self):
+        try:
+            import xrd_gui
+        except Exception as e:
+            messagebox.showerror("XRD", "Không mở được công cụ XRD:\n" + str(e) +
+                                 "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file xrd.py / xrd_ngan_hang.py / xrd_gui.py. Nếu lỗi nhắc backend_tkagg "
+                                 "thì cần bản exe mới (build lại bằng build.bat).")
+            return
+        try:
+            self.cs_xrd = xrd_gui.CuaSoXrd(self.root, lambda: self.lenh_con("ve_xrd_origin.py", "--worker-xrd-origin"))
+        except Exception as e:
+            messagebox.showerror("XRD", f"Lỗi khi mở công cụ XRD: {e}")
+
+    def mo_hrtem(self):
+        try:
+            import hrtem_gui
+        except Exception as e:
+            messagebox.showerror("HR-TEM", "Không mở được công cụ HR-TEM:\n" + str(e) +
+                                 "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file hrtem.py / hrtem_gui.py. Nếu lỗi nhắc backend_tkagg "
+                                 "thì cần bản exe mới (build lại bằng build.bat).")
+            return
+        try:
+            self.cs_hrtem = hrtem_gui.CuaSoHrTem(self.root)
+        except Exception as e:
+            messagebox.showerror("HR-TEM", f"Lỗi khi mở công cụ HR-TEM: {e}")
 
     # ====================== SOẠN HÌNH BÀI BÁO ======================
     def ds_hinh(self):
@@ -1511,6 +1629,14 @@ class App:
                 self.mo_duong_dan(p)
                 return
         messagebox.showinfo("Báo cáo", "Chưa có báo cáo trong thư mục kết quả.\nHãy tick 'Xuất báo cáo Excel' rồi bấm CHẠY.")
+
+    def mo_file_ra(self, ten, thu_muc=False):
+        d = self.thu_muc_ra.get()
+        p = os.path.join(d, ten)
+        if not os.path.exists(p):
+            messagebox.showinfo("Gói nộp bài", f"Chưa có {ten} trong thư mục kết quả.\nTick 'Kèm gói nộp bài' và 'Xuất báo cáo Excel' rồi bấm CHẠY.")
+            return
+        self.mo_duong_dan(d if thu_muc else p)
 
     def mo_nhat_ky(self):
         p = os.path.join(DATA_DIR, "nhat_ky.log")
@@ -1727,7 +1853,7 @@ class App:
         eref = self.so(self.eref, "Eref")
         nhan_i = self.so(self.nhan_i, "hệ số nhân I", duong=True)
         chia_i = self.so(self.chia_i, "hệ số chia I", duong=True)
-        chung = ["--ph", str(ph), "--eref", str(eref), "--nhan-i", str(nhan_i), "--chia-i", str(chia_i)]
+        chung = ["--ph", str(ph), "--eref", str(eref), "--nernst", str(self.so(self.nernst, "hệ số Nernst", duong=True)), "--nhan-i", str(nhan_i), "--chia-i", str(chia_i)]
         if self.chu_ky.get().strip():
             chung += ["--chu-ky", str(self.so(self.chu_ky, "Chu kỳ CV", int, duong=True))]
         thu_muc = os.path.abspath(self.thu_muc_ra.get())
@@ -1800,6 +1926,8 @@ class App:
         chung += ["--n-e", str(self.so(self.n_e, "n electron", duong=True))]
         if self.chong.get() and not ecsa:
             chung.append("--chong")
+            if self.noi_tiep.get():
+                chung.append("--noi-tiep")
 
         # ---- các kết quả tổng hợp (chỉ thêm vào MỘT tiến trình để khỏi làm trùng) ----
         tong_hop = not xem_truoc and not ecsa and not pho
@@ -1833,8 +1961,11 @@ class App:
                 dang = [n for n, b in (("png", self.hb_png), ("pdf", self.hb_pdf), ("tiff", self.hb_tiff)) if b.get()]
                 if not dang:
                     raise ValueError("Hình bài báo: hãy tick ít nhất một định dạng (PNG / PDF / TIFF).")
-                extra += ["--hinh-bai-bao", "--hinh-cot", "1" if self.hinh_cot.get().startswith("Cột đơn") else "2",
-                          "--hinh-dang", ",".join(dang), "--hinh-dpi", str(int(self.so(self.hinh_dpi, "dpi", int, duong=True)))]
+                import hinh_tap_chi_gui as hg
+                extra += ["--hinh-bai-bao", "--hinh-cot", str(hg.ma_cot(self)), "--hinh-tap-chi", self.hinh_tap_chi.get(),
+                          "--hinh-dang", ",".join(dang)]
+                if self.hinh_dpi.get().strip():
+                    extra += ["--hinh-dpi", str(int(self.so(self.hinh_dpi, "dpi", int, duong=True)))]
                 for hinh in self.ds_hinh():
                     extra += ["--hinh-o", ",".join(hinh)]
                 if self.hinh_chu.get().startswith("(a"):
@@ -1868,6 +1999,13 @@ class App:
                 kq += ["--thu-muc-tong-hop", thu_muc]
                 if xuat_bao_cao:
                     kq += ["--bao-cao", thu_muc]
+                    if self.goi_nop_bai.get():
+                        kq += ["--goi-nop-bai"]
+                        try:
+                            import nop_bai_gui
+                            kq += nop_bai_gui.args_nop_bai(self)
+                        except Exception as e:
+                            self.q.put(f"(lưu ý) không đưa được điều kiện đo/vai trò mẫu vào báo cáo: {e}\n")
                 kq += extra
                 kq += ["--i-muc-tieu", ",".join(x.replace(",", ".") for x in mt), "--e-can-bang", str(e_cb)]
             return kq
@@ -1913,6 +2051,11 @@ class App:
             if loi:
                 messagebox.showerror("Chưa thể chạy", "\n".join("• " + x for x in loi))
                 return
+            try:
+                import nop_bai_gui
+                luu_y = list(luu_y) + ([] if xem_truoc else nop_bai_gui.kiem_tra_thong_so(self))
+            except Exception:
+                pass
             if luu_y and not messagebox.askyesno("Lưu ý trước khi chạy", "\n".join("• " + x for x in luu_y) + "\n\nVẫn tiếp tục?"):
                 return
         self.luu_cai_dat()
@@ -2232,6 +2375,69 @@ class App:
         self.root.after(100, self.doc_hang_doi)
 
     # ====================== HƯỚNG DẪN / MẪU / GIỚI THIỆU ======================
+    def chon_dien_cuc_ss(self):
+        """Chọn điện cực so sánh → điền Eref (và tên vào điều kiện đo nếu đang trống). 'Tùy chỉnh' giữ nguyên Eref."""
+        ten = self.dien_cuc_ss.get()
+        v = dcss.eref_cua(ten)
+        if v is None:
+            return
+        self._dang_dong_bo_dc = True
+        try:
+            self.eref.set(f"{v:g}")
+        finally:
+            self._dang_dong_bo_dc = False
+        if not self.dk_tham_chieu.get().strip():
+            self.dk_tham_chieu.set(ten.split("  ")[0])
+        self.luu_cai_dat()
+
+    def dong_bo_dien_cuc_ss(self):
+        """Gõ tay Eref → hộp chọn tự khớp điện cực có cùng giá trị hoặc về 'Tùy chỉnh'."""
+        if getattr(self, "_dang_dong_bo_dc", False):
+            return
+        try:
+            self.dien_cuc_ss.set(dcss.ten_theo_eref(self.eref.get()))
+        except Exception:
+            pass
+
+    def ngu_canh_huong_dan(self):
+        """Giá trị đang đặt trong app, để hướng dẫn theo phép đo hiển thị đúng số của người dùng."""
+        def g(k):
+            try:
+                return getattr(self, k).get()
+            except Exception:
+                return ""
+        so_file = {}
+        for m in self.muc:
+            l = str(m.get("loai_nhan", "?")).upper()
+            for k in ("LSV", "CV", "IT", "EIS"):
+                if l.startswith(k):
+                    so_file[k] = so_file.get(k, 0) + 1
+        return {"ph": g("ph"), "eref": g("eref"), "nernst": g("nernst"), "nhan_i": g("nhan_i"), "chia_i": g("chia_i"), "r_s": g("r_s"), "ir_pct": g("ir_pct"),
+                "khong_rhe": g("khong_rhe"), "i_muc_tieu": g("i_muc_tieu"), "e_can_bang": g("e_can_bang"), "chu_ky": g("chu_ky"),
+                "noi_tiep": g("noi_tiep"), "cs": g("cs"), "e_ecsa": g("e_ecsa"), "tafel_che_do": g("tafel_che_do") or "dong",
+                "tafel_min": g("tafel_min"), "tafel_max": g("tafel_max"), "tafel_e_min": g("tafel_e_min"), "tafel_e_max": g("tafel_e_max"),
+                "so_file": so_file}
+
+    def mo_huong_dan_phep_do(self, tu=""):
+        try:
+            import huong_dan_gui
+        except Exception as e:
+            messagebox.showerror("Hướng dẫn theo phép đo", "Không mở được: " + str(e) +
+                                 "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file huong_dan_phep_do.py / huong_dan_gui.py.")
+            return
+        cong_cu = {"qs": self.mo_cong_cu_qs, "gcd": self.mo_gcd, "xps": self.mo_xps, "xrd": self.mo_xrd, "hrtem": self.mo_hrtem}
+
+        def dat_loai(ten):
+            for x in LOAI:
+                if x == ten or x.startswith(ten):
+                    self.loai.set(x)
+                    return
+        try:
+            self.cs_hd = huong_dan_gui.CuaSoHuongDan(self.root, self.ngu_canh_huong_dan,
+                                                     {"loai": dat_loai, "cong_cu": lambda ma: cong_cu[ma]()}, mo_dau=(tu or "").strip())
+        except Exception as e:
+            messagebox.showerror("Hướng dẫn theo phép đo", f"Lỗi khi mở: {e}")
+
     def mo_huong_dan(self):
         van_ban = "Chưa tìm thấy file HUONG_DAN.md. Hãy bấm 'Kiểm tra cập nhật' để tải về."
         try:
@@ -2345,7 +2551,7 @@ class App:
 
 def main():
     # Che do worker: exe tu goi lai chinh no de xu ly / ve
-    if len(sys.argv) > 1 and sys.argv[1] in ("--worker-origin", "--worker-csv"):
+    if len(sys.argv) > 1 and sys.argv[1] in ("--worker-origin", "--worker-csv", "--worker-xps-origin", "--worker-xrd-origin", "--worker-gcd-origin"):
         mode = sys.argv.pop(1)
         # exe PyInstaller bo qua PYTHONIOENCODING -> ep stdout/stderr dung UTF-8 de in duoc tieng Viet
         for luong in (sys.stdout, sys.stderr):
@@ -2355,6 +2561,12 @@ def main():
                 pass
         if mode == "--worker-origin":
             import ve_origin as m
+        elif mode == "--worker-xps-origin":
+            import ve_xps_origin as m
+        elif mode == "--worker-xrd-origin":
+            import ve_xrd_origin as m
+        elif mode == "--worker-gcd-origin":
+            import ve_gcd_origin as m
         else:
             import xu_ly_dien_hoa as m
         m.main()

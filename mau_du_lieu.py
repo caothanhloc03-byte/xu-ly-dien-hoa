@@ -10,9 +10,9 @@ import math
 import os
 import random
 
-# Hệ số quy đổi mặc định của app: E_RHE = E + 0.0592*pH + Eref ;  I(mA/cm2) = i*1000*nhan/chia
+# Hệ số quy đổi mặc định của app: E_RHE = E + 0.059*pH + Eref (hệ số Nernst mặc định 0.059, đổi được trong app) ;  I(mA/cm2) = i*1000*nhan/chia
 PH, EREF, NHAN_I, CHIA_I = 13.8, 0.098, 2.0, 2.15
-DICH_E = 0.0592 * PH + EREF           # E_RHE - E_raw
+DICH_E = 0.059 * PH + EREF           # E_RHE - E_raw
 
 
 def _viet(duong_dan, nhan_id, E, i, t, tieu_de="E(V)\ti(A/cm²)\tT(s)"):

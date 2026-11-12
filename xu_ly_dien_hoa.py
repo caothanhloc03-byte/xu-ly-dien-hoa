@@ -48,6 +48,7 @@ FIG = (6.0, 4.8)
 
 # ====================== ĐỌC FILE ======================
 def doc_file_tho(duong_dan):
+    ext = os.path.splitext(duong_dan)[1].lower()
     with open(duong_dan, "r", encoding="utf-8", errors="ignore") as f:
         dong = f.read().splitlines()
     nhan = ""
@@ -107,7 +108,7 @@ def quy_doi(df, a):
     if getattr(a, "khong_rhe", False):      # dien the te bao (2 dien cuc): khong quy doi sang RHE
         d[COT_E] = d["E (V)"]
     else:
-        d[COT_E] = d["E (V)"] + 0.0592 * a.ph + a.eref
+        d[COT_E] = d["E (V)"] + float(getattr(a, "nernst", 0.0592)) * a.ph + a.eref
     r_s = float(getattr(a, "r_s", 0.0) or 0.0)
     if r_s:        # bu iR: E_that = E_do - i*Rs*(phan tram bu/100); i la DONG DO THUC (A, cot tho)
         d[COT_E] = d[COT_E] - d["i (A/cm2)"] * r_s * float(getattr(a, "ir_phan_tram", 100.0)) / 100.0
@@ -276,10 +277,16 @@ def xu_ly_it(df, a, nguong_e=0.01, thoi_gian_on_dinh=30.0):
 
 
 def thong_so_it(d, cua_so=200.0):
+    t_tong = float(d["T (s)"].iloc[-1] - d["T (s)"].iloc[0]) if len(d) else 0.0
     d = d[~d["nhieu"]]
     t, i = d["T (s)"].to_numpy(), d[COT_I].to_numpy()
     cuoi = i[t >= t[-1] - cua_so]
     dau = i[t <= t[0] + cua_so]
+    # tốc độ suy giảm: độ dốc hồi quy tuyến tính của |I| theo giờ, tính theo % của giá trị đầu mỗi giờ
+    gio = (t - t[0]) / 3600.0
+    toc_do = float("nan")
+    if len(t) > 3 and gio[-1] > 0 and dau.mean() != 0:
+        toc_do = -100.0 * float(np.polyfit(gio, np.abs(i), 1)[0]) / abs(float(dau.mean()))
     return pd.DataFrame([{
         "E_giu (V vs RHE)": d[COT_E].median(),
         "thoi_gian (h)": (t[-1] - t[0]) / 3600,
@@ -289,18 +296,24 @@ def thong_so_it(d, cua_so=200.0):
         "I_cuoi (mA/cm2)": i[-1],
         "giu_dong (%)": 100 * cuoi.mean() / dau.mean(),
         "suy_giam (%)": 100 * (1 - cuoi.mean() / dau.mean()),
+        "toc_do_suy_giam (%/h)": toc_do,
+        "nhieu_da_loai (h)": max(t_tong - (t[-1] - t[0]), 0.0) / 3600.0,
     }])
 
 
 def duong_it(muc, noi_tiep=False):
+    """Danh sach (muc, T, I). noi_tiep=True: cong don thoi gian - moi duong bat dau ngay sau khi duong truoc ket thuc,
+    bat ke T cua file bat dau tu 0 hay tu gia tri khac."""
     kq, off = [], 0.0
     for m in muc:
         d = m["d"]
         h = d[~d["nhieu"]]
-        t = h[COT_T].to_numpy() + (off if noi_tiep else 0.0)
+        tt = d[COT_T].to_numpy(dtype=float)
+        t0 = float(tt[0]) if len(tt) else 0.0
+        t = h[COT_T].to_numpy(dtype=float) + ((off - t0) if noi_tiep else 0.0)
         kq.append((m, t, h[COT_I].to_numpy()))
-        if noi_tiep:
-            off += float(d[COT_T].iloc[-1])
+        if noi_tiep and len(tt):
+            off += float(tt[-1]) - t0
     return kq
 
 
@@ -595,6 +608,7 @@ def them_tham_so_chung(ap):
     ap.add_argument("files", nargs="+")
     ap.add_argument("--ph", type=float, default=PH_MAC_DINH)
     ap.add_argument("--eref", type=float, default=EREF_MAC_DINH)
+    ap.add_argument("--nernst", type=float, default=0.0592, help="he so Nernst (V/pH): E_RHE = E + nernst*pH + Eref (0.0592 chinh xac o 25 C; file Excel hay dung 0.059)")
     ap.add_argument("--nhan-i", type=float, default=NHAN_I_MAC_DINH)
     ap.add_argument("--chia-i", type=float, default=CHIA_I_MAC_DINH)
     ap.add_argument("--loai", default=None)
@@ -614,6 +628,9 @@ def them_tham_so_chung(ap):
     ap.add_argument("--tafel-max", type=float, default=11.0)
     ap.add_argument("--thu-muc-ra", default=None)
     ap.add_argument("--khong-canh-bao", action="store_true", help="khong in canh bao (van ghi nhan)")
+    ap.add_argument("--dieu-kien-json", default=None, help="dieu kien thi nghiem (JSON) cho doan Methods")
+    ap.add_argument("--vai-tro-json", default=None, help="vai tro/nhom tung mau (JSON) cho bang kiem tra nop bai")
+    ap.add_argument("--goi-nop-bai", action="store_true", help="kem bao cao: bang nop bai, kiem tra, methods, goi_tai_lap.zip")
     ap.add_argument("--bao-cao", default=None, help="thu muc de xuat bao_cao_tong_hop.xlsx (bo trong = khong xuat)")
     ap.add_argument("--i-muc-tieu", default="10", help="cac mat do dong muc tieu (mA/cm2) cho bao cao, cach nhau dau phay")
     ap.add_argument("--e-can-bang", type=float, default=1.23, help="dien the can bang (V) de tinh qua the trong bao cao")
@@ -646,9 +663,10 @@ def them_tham_so_chung(ap):
     ap.add_argument("--tof-chieu", default="ca_hai", choices=["ca_hai", "catot", "anot"], help="chieu quet dung de ve TOF")
     ap.add_argument("--tof-rhe", action="store_true", help="loc cua so theo dien the da quy doi RHE (mac dinh: dien the trong file)")
     ap.add_argument("--hinh-bai-bao", action="store_true", help="xuat hinh ghep nhieu o chuan bai bao")
-    ap.add_argument("--hinh-cot", type=int, default=2, help="1 = cot don (8.6 cm), 2 = cot doi (17.8 cm)")
+    ap.add_argument("--hinh-cot", type=int, default=2, help="1 = cot don, 15 = 1.5 cot (neu tap chi co), 2 = cot doi; be rong theo --hinh-tap-chi")
+    ap.add_argument("--hinh-tap-chi", default="Tùy chỉnh", help="ACS | RSC | Elsevier | Nature | Tùy chỉnh: kho cot, co chu, net, dpi, chu o theo tap chi")
     ap.add_argument("--hinh-dang", default="png,pdf,tiff")
-    ap.add_argument("--hinh-dpi", type=int, default=600)
+    ap.add_argument("--hinh-dpi", type=int, default=0, help="0 = theo khuyen nghi cua tap chi")
     ap.add_argument("--hinh-o", action="append", default=None,
                     help="cac o cua MOT hinh theo thu tu (A,B,C...): lsv,tafel,eis,it,cot; lap lai de tao nhieu hinh; bo trong = tu chon")
     ap.add_argument("--nhan-hinh", action="append", default=[], help="ten mau rieng trong hinh bai bao (theo thu tu file; rong = dung nhan goc)")
