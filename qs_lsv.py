@@ -115,6 +115,8 @@ def ghep_tu_dong(nhan_cv, thu_muc):
 
 # ---------------------------------------------------------------- tính & vẽ
 def chay(muc, a, thu_muc, ve=True):
+    if getattr(a, "chi_qs", False):
+        return chi_doc_qs(muc, a, thu_muc)
     """muc: các mẫu CV (xl.nap_muc). Trả về (bảng tổng hợp, danh sách dict) hoặc None."""
     import xu_ly_dien_hoa as xl
     cv = [m for m in muc if m["loai"] in ("CV", "LSV")]
@@ -202,6 +204,47 @@ def chay(muc, a, thu_muc, ve=True):
     if ve:
         ve_hinh(cac, os.path.join(thu_muc, "TOF_QsLSV"))
     return tong, cac
+
+
+def chi_doc_qs(muc, a, thu_muc):
+    """Chỉ đọc bộ dữ liệu Qs-LSV của từng mẫu (không cần tính Q/TOF): ghi QsLSV_<nhãn>.csv để dùng cho Tafel. Trả về (bảng, danh sách) hoặc None."""
+    ds_m = [m for m in muc if m["loai"] in ("CV", "LSV")] or list(muc)
+    qs_rieng = list(getattr(a, "qs_lsv", None) or [])
+    thu_chung = getattr(a, "qs_thu_muc", None)
+    tu_dong = ghep_tu_dong([m["nhan"] for m in ds_m], thu_chung) if thu_chung else {}
+    os.makedirs(thu_muc, exist_ok=True)
+    hang = []
+    for k, m in enumerate(ds_m):
+        ds_file = []
+        if k < len(qs_rieng) and qs_rieng[k]:
+            for dd_ in str(qs_rieng[k]).split("|"):
+                if dd_.strip():
+                    ds_file += liet_ke_file(dd_.strip())
+        elif m["nhan"] in tu_dong:
+            ds_file = tu_dong[m["nhan"]]
+        if not ds_file:
+            print(f"  (canh bao) {m['nhan']}: khong co file Qs-LSV - bo qua mau nay.")
+            continue
+        cb = []
+        qs = doc_qs_lsv(ds_file, a, cb)
+        for c in dict.fromkeys(cb):
+            print(f"  (canh bao) {c}")
+        if qs.empty:
+            print(f"  (canh bao) {m['nhan']}: khong doc duoc diem nao tu {len(ds_file)} file Qs-LSV.")
+            continue
+        ten = "".join(c if c.isalnum() or c in "-_" else "_" for c in m["nhan"])
+        try:
+            qs.to_csv(os.path.join(thu_muc, f"QsLSV_{ten}.csv"), index=False, encoding="utf-8-sig")
+        except PermissionError:
+            print(f"  (canh bao) khong ghi duoc QsLSV_{ten}.csv - hay dong file dang mo.")
+        hang.append({"Nhãn": m["nhan"], "Số điểm Qs-LSV": len(qs), "Số file Qs-LSV": len(ds_file),
+                     "E RHE nhỏ nhất (V)": float(qs[C_E].min()), "E RHE lớn nhất (V)": float(qs[C_E].max())})
+        print(f"  {m['nhan']}: {len(qs)} điểm Qs-LSV ({len(ds_file)} file), E {qs[C_E].min():.3f} → {qs[C_E].max():.3f} V vs RHE, "
+              f"|J| {qs[C_J].abs().min():.3g} → {qs[C_J].abs().max():.3g} mA/cm²")
+    if not hang:
+        print("  (canh bao) khong doc duoc Qs-LSV cua mau nao.")
+        return None
+    return pd.DataFrame(hang), []
 
 
 def ve_hinh(cac, goc):

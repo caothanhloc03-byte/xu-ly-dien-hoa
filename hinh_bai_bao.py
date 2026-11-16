@@ -78,10 +78,10 @@ def _o_tafel(ax, muc, a):
             continue
         ax.plot(df["Log(J)"], df["Potential (V vs RHE)"], "o", ms=2.5, color=m["mau"])
         xx = np.array([df["Log(J)"].min(), df["Log(J)"].max()])
-        ax.plot(xx, a_s * xx + b, "-", lw=ST["lw"], color=m["mau"], label=f"{m['nhan']} ({abs(slope):.0f} mV dec$^{{-1}}$)")
-    ax.set_xlabel("log |J| (mA cm$^{-2}$)", fontsize=ST["nhan"])
-    ax.set_ylabel(xl.NHAN_POT, fontsize=ST["nhan"])
-    ax.legend(fontsize=ST["ct"], frameon=True, framealpha=0.85, edgecolor="none", loc="best")
+        ax.plot(xx, a_s * xx + b, "-", lw=1.4, color=m["mau"], label=f"{m['nhan']} ({abs(slope):.0f} mV dec$^{{-1}}$)")
+    ax.set_xlabel("log |J| (mA cm$^{-2}$)", fontsize=9)
+    ax.set_ylabel(xl.NHAN_POT, fontsize=9)
+    ax.legend(fontsize=7, frameon=True, framealpha=0.85, edgecolor="none", loc="best")
 
 
 def _o_eis(ax, muc, a):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Xử lý file điện hóa thô (CS Studio): LSV, CV, IT, EIS, ECSA và Tafel. Hỗ trợ VẼ CHỒNG nhiều mẫu lên một hình.
+Xử lý file điện hóa thô (CS Studio): LSV, CV, IT, EIS, ECSA và Tafel (Tafel cũ trên đường LSV/CV; Tafel từ Qs-LSV: tafel_qs.py). Hỗ trợ VẼ CHỒNG nhiều mẫu lên một hình.
 
 QUY ĐỔI (mặc định):
     E   -> RHE (V)   = E + 0.0592 * 13.8 + 0.098
@@ -209,6 +209,7 @@ def duong_cv_lsv(m, chu_ky=None):
         ck = chon_chu_ky(d, chu_ky)
         d = d[d["chu_ky"] == ck]
     return d[COT_E].to_numpy(), d[COT_I].to_numpy()
+
 
 
 # ====================== TAFEL ======================
@@ -427,7 +428,7 @@ def ve_don(m, goc, a):
 
 def ve_chong(loai, muc, goc, a):
     plt = _plt()
-    if loai in ("CV", "LSV"):
+    if loai in ("CV", "LSV", "TAFEL"):
         fig, ax = plt.subplots(figsize=FIG)
         for m in muc:
             x, y = duong_cv_lsv(m, a.chu_ky)
@@ -471,7 +472,7 @@ def bang_so_sanh(loai, muc, a):
             k += "_"
         cot[k] = pd.Series(v)
 
-    if loai in ("CV", "LSV"):
+    if loai in ("CV", "LSV", "TAFEL"):
         for m in muc:
             x, y = duong_cv_lsv(m, a.chu_ky)
             them(f"{m['nhan']} | {NHAN_E}", x)
@@ -634,6 +635,10 @@ def them_tham_so_chung(ap):
     ap.add_argument("--bao-cao", default=None, help="thu muc de xuat bao_cao_tong_hop.xlsx (bo trong = khong xuat)")
     ap.add_argument("--i-muc-tieu", default="10", help="cac mat do dong muc tieu (mA/cm2) cho bao cao, cach nhau dau phay")
     ap.add_argument("--e-can-bang", type=float, default=1.23, help="dien the can bang (V) de tinh qua the trong bao cao")
+    ap.add_argument("--tafel-qs-json", default=None, help="JSON he so Tafel tu cong cu Qs-LSV (Tafel_QsLSV.json): dien cot Tafel o so sanh/nop bai/bao cao")
+    ap.add_argument("--cdl-nhieu", action="store_true", help="cong cu Cdl nhieu mau: moi 'file' la 1 THU MUC ECSA (cac CV nhieu toc do quet); ve DeltaJ theo toc do quet, xuat Cdl")
+    ap.add_argument("--cdl-y", default="A", choices=["A", "mA"], help="don vi truc y cua hinh Cdl nhieu mau")
+    ap.add_argument("--cdl-khong-nhan", action="store_true", help="khong ghi chu Cdl len hinh")
     ap.add_argument("--tafel-e-min", type=float, default=None, help="vung Tafel theo dien the (V): can ca --tafel-e-min va --tafel-e-max")
     ap.add_argument("--tafel-e-max", type=float, default=None)
     ap.add_argument("--khong-rhe", action="store_true", help="khong quy doi sang RHE (dien the te bao 2 dien cuc)")
@@ -651,6 +656,7 @@ def them_tham_so_chung(ap):
     ap.add_argument("--tof-e-max", type=float, default=None)
     ap.add_argument("--tof-n", type=float, default=2.0, help="so electron trao doi trong cong thuc TOF")
     ap.add_argument("--qs-tof", action="store_true", help="cong cu Qs-LSV + TOF: file CV -> N; thu muc Qs-LSV -> I theo E")
+    ap.add_argument("--chi-qs", action="store_true", help="chi doc bo du lieu Qs-LSV (ghi QsLSV_<nhan>.csv), khong tinh Q/TOF - dung cho Tafel tu Qs-LSV")
     ap.add_argument("--qs-thu-muc", default=None, help="thu muc chung chua file Qs-LSV (tu ghep theo ten mau)")
     ap.add_argument("--qs-lsv", action="append", default=[], help="Qs-LSV cua tung file CV theo thu tu (thu muc hoac file; nhieu muc cach nhau '|'; rong = ghep tu dong)")
     ap.add_argument("--qs-nguong", type=float, default=3.0, help="mV: E nhay qua nguong nay = buoc dien the moi")
@@ -706,6 +712,14 @@ def khoi_dong_canh_bao(a):
         canh_bao.dat_im_lang(getattr(a, "khong_canh_bao", False))
     if bao_cao:
         bao_cao.reset()
+    try:
+        import tafel_qs
+        if getattr(a, "tafel_qs_json", None):
+            tafel_qs.nap_json(a.tafel_qs_json)
+        else:
+            tafel_qs.NHO.clear()
+    except ImportError:
+        pass
 
 
 def kiem_tra_cac_muc(muc, a):
@@ -802,6 +816,15 @@ def main():
     them_tham_so_chung(ap)
     ap.add_argument("--khong-ve", action="store_true")
     a = ap.parse_args()
+    if getattr(a, "cdl_nhieu", False):
+        import cdl_nhieu
+        tm = [p for p in mo_rong_file(a.files) if os.path.isdir(p) or os.path.isfile(p)]
+        mat = [p for p in a.files if not os.path.exists(p)]
+        if mat:
+            print("[LOI] Khong tim thay thu muc ECSA:\n" + "\n".join("   - " + p for p in mat))
+            sys.exit(2)
+        cdl_nhieu.chay(tm, a, a.thu_muc_ra or os.path.join(os.path.dirname(os.path.abspath(tm[0])), "Cdl_nhieu"), ve=not a.khong_ve)
+        return
     ds = mo_rong_file(a.files)
     mat = [p for p in ds if not os.path.isfile(p)]
     if mat:

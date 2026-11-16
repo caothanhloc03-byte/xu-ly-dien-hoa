@@ -17,7 +17,7 @@ GOI_Y = """Bạn có thể hỏi (có dấu hoặc không dấu đều được)
   • điện thế tại 10 mA                     → điện thế đạt 10 mA/cm² (có thể nhiều giá trị: 10 và 100 mA)
   • quá thế tại 10 mA                      → như trên, trừ điện thế cân bằng (mặc định 1.23 V; "cân bằng 0 V" để đổi)
   • dòng tại 1.6 V                         → mật độ dòng tại điện thế 1.6 V vs RHE
-  • tafel / tafel vùng 5 đến 15 mA         → hệ số Tafel (mV/dec)
+  • tafel / tafel vùng 5 đến 15 mA         → hệ số Tafel (mV/dec) từ LSV/CV, kèm kết quả Tafel Qs-LSV đã lưu
   • so sánh các mẫu / xếp hạng / hoạt độ khối / tof  → bảng quá thế, Tafel, hạng (cần điền mục 3c cho hoạt độ khối, TOF)
   • ecsa / ecsa cs 0.04 tại 1.0 V          → Cdl và ECSA từ các file CV
   • dòng lớn nhất / dòng trung bình từ 1.4 đến 1.9 V   → thống kê một đoạn E
@@ -156,7 +156,7 @@ def _dong_tai_the(nc, q, ds):
     return "\n".join(dong)
 
 
-def _tafel(nc, q, ds):
+def _tafel_lsv(nc, q, ds):
     q2 = bo_tham_chieu_file(q)
     vmin, vmax = 9.0, 11.0
     m = re.search(rf"({NUM})\s*(?:-|den|toi|~)\s*({NUM})", q2)
@@ -171,6 +171,29 @@ def _tafel(nc, q, ds):
             dong.append(f"  • {nhan(nc, k)}: {fmt(kq['he_so_Tafel_mV_dec'], 1)} mV/dec "
                         f"(R² = {fmt(kq['R2'], 4)}, {kq['so_diem']} điểm)")
     return "\n".join(dong)
+
+
+def _tafel_qs(nc, q, ds):
+    """Tafel không còn tính từ đường LSV/CV: chỉ báo kết quả đã lưu từ công cụ Qs-LSV (nếu có) và chỉ cách làm."""
+    import tafel_qs
+    dong = ["Tafel được tính trong công cụ Qs-LSV: fit E theo log|J| trên các điểm Qs-LSV (điểm cuối mỗi bước điện thế), "
+            "chọn vùng theo dòng hoặc theo điện thế và số điểm.",
+            "Cách làm: tab Phân tích ▸ nhóm 'Qs-LSV & TOF' ▸ Mở công cụ ▸ 'Tafel từ Qs-LSV...' (gõ 'hướng dẫn tafel' để xem từng bước)."]
+    co = []
+    for k in ds:
+        b = tafel_qs.cua(nhan(nc, k))
+        if b:
+            co.append(f"  • {nhan(nc, k)}: {fmt(abs(b['he_so_Tafel (mV/dec)']), 1)} mV/dec (R² = {fmt(b.get('R2'), 4)}, {b['so_diem']} điểm; {b['vung_dong (mA/cm2)']})")
+    if co:
+        dong.append("Kết quả Tafel đã lưu từ Qs-LSV:")
+        dong += co
+    else:
+        dong.append("Chưa có kết quả Tafel đã lưu cho các mẫu này (bấm 'Lưu kết quả...' trong cửa sổ Tafel rồi hỏi lại).")
+    return "\n".join(dong)
+
+
+def _tafel(nc, q, ds):
+    return _tafel_lsv(nc, q, ds) + "\n\n" + _tafel_qs(nc, q, ds)
 
 
 def _ecsa(nc, q, ds, da_chi_dinh):

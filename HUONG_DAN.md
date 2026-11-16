@@ -505,3 +505,61 @@ Nếu file không có header CS Studio (hoặc header không ghi khối lượng
 - **Công thức**: Csp = I × Δt / (m × ΔV), tính cho từng chu kỳ xả từ đường GCD: Δt = thời gian xả của chu kỳ đó (s), ΔV = chênh điện thế của chu kỳ (với bộ công thức "Kiểu file Excel": V đỉnh nạp − V cuối xả), I và m là số bạn nhập. Mỗi mức dòng lấy trung vị các chu kỳ (có thể bỏ chu kỳ đầu).
 - **Nhập I và m**: ở danh sách mẫu tab ① có hai ô: khối lượng (mg) và **I (mA)**. Ô I để trống thì app đọc dòng từ file; có số thì app dùng đúng số đó (và không đọc cột dòng). Mật độ dòng j = I/m (A/g) là vị trí cột trên trục x. Chọn nhiều file cùng một vật liệu (mỗi file một dòng) hoặc một file có nhiều mức dòng đều được.
 - **Đồ thị ② C–j (tab ④)**: mặc định là **đồ thị cột** như hình mẫu: cột đen, khung dày, chữ đậm, vạch chia ra ngoài, trục y từ 0, tên mẫu ở góc trên phải (NiCr2O4 tự thành NiCr₂O₄). Nhiều mẫu: các cột đặt cạnh nhau theo màu từng mẫu. Đổi sang "Đường + điểm" ở ô *Kiểu đồ thị*; đại lượng mặc định là Csp (F/g). Ở Origin đồ thị được vẽ bằng kiểu cột (chưa kiểm thử trên Origin thật).
+
+
+## v92 - Tafel làm trong công cụ Qs-LSV (bỏ Tafel cũ)
+**Đã bỏ**: Loại phép đo "Tafel", nhóm "Tafel" (vùng dòng/vùng điện thế) ở tab Phân tích, ô hình "Tafel" trong hình bài báo, các tùy chọn dòng lệnh `--tafel-min/--tafel-max/--tafel-e-min/--tafel-e-max` và phần hỏi đáp tính Tafel trên đường LSV/CV. File cài đặt cũ có Loại = Tafel tự đổi thành LSV.
+
+**Cách làm mới**
+1. Tab Phân tích ▸ nhóm "Qs-LSV & TOF" (hoặc nhóm "Tafel") ▸ mở công cụ Qs-LSV; thêm mẫu và gán thư mục/file Qs-LSV (hoặc "Thư mục Qs-LSV chung" để app ghép theo tên). Tafel không cần tốc độ quét hay tính TOF.
+2. Bấm **Tafel từ Qs-LSV...**: app đọc các điểm Qs-LSV (điểm cuối mỗi bước điện thế, E quy đổi RHE, J mA/cm²) rồi mở cửa sổ Tafel.
+3. Trong cửa sổ Tafel (đồ thị E theo log|J| cập nhật ngay):
+   - **Vùng fit**: *Theo dòng |J|* (từ–đến, mA/cm²), *Theo điện thế E* (V vs RHE) hoặc *Tất cả điểm*.
+   - **Số điểm N** (≥ 3): *tất cả điểm trong vùng*, *N điểm đầu vùng* (|J| nhỏ), *N điểm cuối vùng* (|J| lớn) hoặc *N điểm liên tiếp tốt nhất* (cửa sổ có R² cao nhất).
+   - **Bỏ từng điểm**: bấm đúp một dòng trong bảng điểm (✖ đã loại / ✔ dùng để fit / ngoài vùng).
+   - **Trục y**: E (V vs RHE) hoặc quá thế η (nhập E⁰: OER 1.23 V, HER 0 V). Nút "Áp vùng này cho mọi mẫu".
+   - Kết quả: b (mV/dec) ± sai số, R², số điểm, số decade dòng, cảnh báo (< 5 điểm, R² < 0.98, |b| > 500 hoặc < 20 mV/dec, vùng < 0.5 decade).
+4. **Xuất**: *Xuất hình + CSV* (Tafel_QsLSV.png/.pdf, Tafel_QsLSV_tong_hop.csv, Tafel_QsLSV_<mẫu>_diem.csv), *Vẽ ra Origin* (hình `Qs_Tafel`: điểm đã dùng + đường fit; chưa kiểm thử trên Origin thật), *Lưu kết quả cho so sánh / nộp bài / báo cáo* (ghi `Tafel_QsLSV.json`).
+5. Sau khi lưu, cột "Tafel (mV/dec)" ở So sánh mẫu, bảng nộp bài, sheet "Tafel (Qs-LSV)" của báo cáo Excel và câu Methods lấy từ kết quả đó (khớp theo **nhãn mẫu**; mẫu chưa có kết quả để trống). Hỏi đáp "tafel" chỉ báo kết quả đã lưu và cách làm.
+
+Công thức: E = a + b·log₁₀|J|, b (mV/dec) = độ dốc × 1000; dùng |J| nên OER (dòng dương) và HER (dòng âm) đều được. Lưu ý: dữ liệu Qs-LSV cần bù iR (đặt Rs ở tab Phân tích) trước khi fit.
+
+## v93 - Khôi phục Tafel cũ, giữ Tafel mới
+
+- **Tafel cũ (trên đường LSV/CV) đã trở lại**: Loại phép đo = Tafel, nhóm Tafel ở tab Phân tích (vùng theo dòng mA/cm² hoặc theo điện thế V), hình Tafel (E theo log|J| + đường fit), vẽ Origin, hỏi đáp "tafel", cột `Tafel (mV/dec)` ở bảng so sánh và sheet `Tafel` trong báo cáo.
+- **Tafel mới từ Qs-LSV giữ nguyên**: nút 'Tafel từ Qs-LSV...' trong công cụ Qs-LSV (chọn vùng theo dòng/điện thế, số điểm, bỏ điểm, xuất hình/CSV, Origin).
+- Hai cách có cột/sheet riêng để không lẫn: `Tafel (mV/dec)` (từ LSV/CV) và `Tafel Qs-LSV (mV/dec)`; sheet `Tafel` và `Tafel (Qs-LSV)`.
+- Hướng dẫn: gõ "tafel" (cách trên LSV/CV) hoặc "tafel qs" (cách từ Qs-LSV) ở tab Trợ giúp/Hỏi đáp.
+
+## v94 - Cdl nhiều mẫu từ các thư mục ECSA
+
+- Trong công cụ **Qs-LSV & TOF** có nút **"Cdl nhiều mẫu (ECSA)..."**. Thêm từng thư mục ECSA (hoặc "Thêm các thư mục con của..." để thêm cả loạt); mỗi thư mục = một mẫu, chứa các file CV ở nhiều tốc độ quét.
+- App lấy ΔJ = (Ja − Jc)/2 tại E lấy dòng (để trống = giữa vùng chung của từng mẫu), fit ΔJ theo tốc độ quét (V/s): độ dốc = **Cdl (mF/cm²)**.
+- Kết quả: một hình chung (điểm theo mẫu, đường fit nét đứt cùng màu, nhãn C_dl, chú thích cùng màu) — `Cdl_nhieu.png/.pdf` (Matplotlib) hoặc hình `Cdl_nhieu` trong Origin; bảng `Cdl_nhieu_tong_hop.csv` (Cdl, R², số điểm) và `Cdl_nhieu_diem.csv`.
+- Mục này **không tính/vẽ ECSA**. Công thức hóa học trong nhãn (Cu2O) tự hạ chỉ số dưới ở chú thích. Gõ "cdl" ở tab Trợ giúp để xem hướng dẫn từng bước.
+
+## v95 - Hình Cdl nhiều mẫu trong Origin giống bài báo
+
+- Hình `Cdl_nhieu` vẽ bằng Origin nay có: mỗi mẫu một ký hiệu (vuông, tròn, tam giác...), đường fit **nét đứt** cùng màu, nhãn C_dl cùng màu xoay theo đường, chú thích mỗi mẫu một dòng ở góc trên trái (không lặp, không kèm Cdl), trục X/Y bắt đầu từ 0.
+- Nếu vị trí/độ xoay nhãn C_dl chưa vừa ý, kéo nhãn trong Origin (các nhãn tên cdl1, cdl2, ...).
+
+## v96 - Gạch trên đầu chữ ở hình Origin
+
+- Mọi hình Origin: app gỡ các chuỗi gạch-trên-chữ (`\ab( )`) còn sót trong tiêu đề trục và chú thích, và in nội dung thật của từng tiêu đề (`[chu] XB: ...`) vào nhật ký.
+- Nếu hình vẫn còn gạch trên chữ: tab Hình ▸ nhóm 'Cỡ chữ & vạch chia' ▸ tick **Không chỉnh cỡ chữ tiêu đề/chú thích** rồi vẽ lại (app giữ cỡ chữ mặc định của Origin ở tiêu đề/chú thích). Gửi kèm các dòng `[chu]` trong nhật ký để chẩn đoán tiếp.
+
+## v97 - Gạch trên chữ là lỗi của Origin 2024
+
+- Dấu gạch trên đầu mọi chữ (tiêu đề trục, chú thích, nhãn) ở hình Origin là lỗi hiển thị của **Origin 2024 bản đầu**; OriginLab đã sửa từ **Origin 2024b**. Cách khắc phục: cập nhật Origin (Help ▸ Check for Updates / tải bản 2024b trở lên). App sẽ in cảnh báo này trong nhật ký khi gặp đúng bản đó.
+
+## v98 - Tìm nguyên nhân gạch trên chữ ở hình Origin
+
+- Vì vẽ tay trong Origin không bị gạch, lỗi nằm ở một thao tác của app. Tab Hình ▸ nhóm 'Cỡ chữ & vạch chia' có 2 ô thử nghiệm: **Không chỉnh cỡ chữ tiêu đề/chú thích** và **Không đổi kích thước khung**. Tick từng ô (rồi cả hai), vẽ lại và cho biết gạch còn không để xác định thao tác gây lỗi.
+
+
+## v99 - Tinh chỉnh giao diện + logo cho mọi cửa sổ
+
+- **Logo ở mọi cửa sổ:** các công cụ con (Qs-LSV, Cdl nhiều mẫu, Siêu tụ/Pin, XRD, XPS, HRTEM, Hướng dẫn...) và hộp thoại phụ nay đều hiện logo Echem Studio ở thanh tiêu đề / thanh tác vụ (trước đây chỉ cửa sổ chính). Làm một lần ở `giao_dien_dep.cai_logo_toan_app`, nên công cụ mới thêm sau này cũng tự có logo.
+- **Cửa sổ chính (bố cục giữ nguyên):** dải logo + tên + phiên bản ở đầu; nút **CHẠY XỬ LÝ & VẼ** màu xanh; khung "Báo cáo & Thông số tính toán" nền tối (cảnh báo màu cam, lỗi đỏ, tốt xanh); tiêu đề nhóm và tiêu đề bảng in đậm; tab rộng hơn một chút.
+- **Cửa sổ Cdl nhiều mẫu:** có thêm dải logo ở đầu (mẫu cho các công cụ khác nếu muốn: `giao_dien_dep.dai_logo(cua_so, "Tên công cụ", "mô tả").grid(row=0, ...)`).
+- File mới: `giao_dien_dep.py`. Nếu thiếu file này app vẫn chạy như cũ (không logo phụ/màu mới).

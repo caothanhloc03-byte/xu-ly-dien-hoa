@@ -124,7 +124,7 @@ def kiem_tra(sheets, bang, a, ds, tafel):
 
     them("7.1", "Quá thế tại 10 mA cm⁻²", any(k.startswith("Quá thế tại") for k in cot) and not getattr(a, "khong_qua_the", False),
          "Tick tính quá thế (nhập điện thế cân bằng) và đặt 10 trong 'mật độ dòng mục tiêu'.")
-    them("7.2", "Độ dốc Tafel", bool(tafel), "Chạy phép Tafel cho các mẫu chính.")
+    them("7.2", "Độ dốc Tafel", bool(tafel), "Qs-LSV ▸ Tafel từ Qs-LSV ▸ Lưu kết quả; rồi chạy lại báo cáo.")
     ecsa = bool(_sheet(sheets, "ECSA") or _sheet(sheets, "ECSA - điểm"))
     them("7.3", "ECSA / Cdl", ecsa, "Chạy ECSA (CV ở nhiều tốc độ quét trong vùng không có phản ứng).")
     gio = [_so(h.get("Thời gian đo (h)")) for h in bang if h.get("Thời gian đo (h)") is not None]
@@ -200,7 +200,17 @@ def doan_methods(a, ds):
     eb = getattr(a, "e_can_bang", None)
     if eb is not None:
         muc.append(f"Overpotentials were calculated against the equilibrium potential of {eb} V. ")
-    muc.append(f"Tafel slopes were obtained by linear fitting of E versus log|j| in the range {getattr(a, 'tafel_min', '')}–{getattr(a, 'tafel_max', '')} mA cm⁻². ")
+    try:
+        import tafel_qs
+        vung = next(iter(tafel_qs.NHO.values()))["vung_dong (mA/cm2)"] if tafel_qs.NHO else None
+    except (ImportError, StopIteration, KeyError):
+        vung = None
+    if vung:
+        muc.append(f"Additionally, Tafel slopes were obtained by linear fitting of E versus log|j| using the quasi-steady-state (Qs-LSV) data points ({vung}). ")
+    if getattr(a, "tafel_min", None) is not None:
+        muc.append(f"Tafel slopes were obtained by linear fitting of E versus log|j| of the polarization curve in the current-density range of {a.tafel_min:g}–{a.tafel_max:g} mA cm⁻². ")
+    elif not vung:
+        muc.append("[Tafel slopes: state the fitted range.] ")
     muc.append(f"The electrochemically active surface area was estimated from the double-layer capacitance (Cdl) using Cs = {getattr(a, 'cs', 0.04)} mF cm⁻². ")
     if getattr(a, "tai_trong", None):
         muc.append(f"The catalyst loading was {a.tai_trong} mg cm⁻². ")

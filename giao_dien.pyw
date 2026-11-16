@@ -41,6 +41,7 @@ nd = _nhap("nhan_dang_nhanh")
 lt = _nhap("loi_than_thien")
 md = _nhap("mau_du_lieu")
 et = _nhap("ecsa_tuong_tac")
+gd = _nhap("giao_dien_dep")            # logo cho mọi cửa sổ + màu chủ đạo (thiếu file thì app vẫn chạy như cũ)
 try:
     import dien_cuc_so_sanh as dcss
 except Exception:                                  # thiếu file khi cập nhật dở: hộp chọn điện cực chỉ còn 'Tùy chỉnh'
@@ -63,14 +64,15 @@ CO_CONSOLE = 0x08000000 if os.name == "nt" else 0
 MAC_DINH = {
     "loai": LOAI[0], "chong": True, "noi_tiep": False, "mau_chu_ky": False, "chu_ky": "",
     "ph": "13.8", "eref": "0.098", "nernst": "0.059", "dien_cuc_ss": "Hg/HgO (1 M KOH)  0.098 V", "nhan_i": "2", "chia_i": "2.15", "e_ecsa": "", "cs": "0.040",
-    "tafel_min": "9.0", "tafel_max": "11.0", "dung_origin": True, "dung_csv": True, "template": "",
+    "dung_origin": True, "dung_csv": True, "template": "",
     "thu_muc_ra": THU_MUC_RA_MD, "rong": "1200", "co_chu": "22", "day_net": "2", "ti_le": "1.28",
-    "day_khung": "3", "le_max": "0.5", "co_chu_td": "", "co_chu_ct": "", "vc_dai": "8", "vc_day": "",
+    "day_khung": "3", "le_max": "0.5", "co_chu_td": "", "co_chu_ct": "", "khong_chinh_chu": False, "khong_doi_khung": False, "vc_dai": "8", "vc_day": "",
     "vp_so": "1", "vp_dai": "4", "vp_day": "",
     "x_min": "", "x_max": "", "x_buoc": "", "y_min": "", "y_max": "", "y_buoc": "",
     "r_s": "0", "ir_pct": "100", "tai_trong": "", "qua_the_ht": "300", "so_mol_tam": "", "khoi_luong_mol": "",
     "ti_le_tam": "1", "n_e": "4", "so_sanh": True,
-    "khong_rhe": False, "khong_qua_the": False, "tafel_che_do": "dong", "tafel_e_min": "", "tafel_e_max": "",
+    "tafel_min": "9.0", "tafel_max": "11.0", "tafel_che_do": "dong", "tafel_e_min": "", "tafel_e_max": "",
+    "khong_rhe": False, "khong_qua_the": False,
     "fe_v_h2": "", "fe_nhiet_do": "25", "fe_ap_suat": "101.325", "fe_n": "2", "fe_hoi_nuoc": True, "fit_eis": False,
     "tai_lieu": "", "hinh_bai_bao": False, "hinh_cot": KHO_HINH[2], "hinh_tap_chi": "Tùy chỉnh", "hb_png": True, "hb_pdf": True, "hb_tiff": True,
     "hinh_dpi": "", "tof_e_min": "-1.5", "tof_e_max": "-1.1", "tof_n": "2", "tof_n_q": "2", "tof_v": "", "tof_dien_tich": "Vòng kín (∮ I dE)", "tof_rhe": False, "qs_thu_muc": "", "qs_nguong": "3", "qs_duoi": "0", "qs_da_rhe": False, "qs_origin": True, "qs_matplotlib": True,
@@ -91,14 +93,15 @@ GOI_Y = {
     "eref": "Điện thế chuẩn của điện cực so sánh so với SHE (V), ví dụ Hg/HgO 1M KOH ≈ 0.098 V.",
     "nhan_i": "Hệ số nhân dòng: I (mA/cm²) = i × 1000 × (hệ số nhân) ÷ (hệ số chia).",
     "chia_i": "Hệ số chia dòng, thường là diện tích điện cực (cm²) dùng để quy ra mật độ dòng.",
-    "tafel": "Vùng mật độ dòng (mA/cm²) dùng để fit đường Tafel (E theo log|J|).\nVới LSV có pic nhỏ, app chỉ lấy nhánh đi lên sau cùng.",
     "e_ecsa": "Điện thế (V vs RHE) lấy dòng điện dung cho ECSA.\nĐể trống: app lấy giữa vùng chung. Chọn vùng KHÔNG có pic oxi hóa-khử để R² cao.",
     "cs": "Điện dung riêng Cs của bề mặt phẳng lý tưởng (mF/cm²). Thường 0.020–0.060 trong kiềm; mặc định 0.040.",
     "chu_ky": "Chu kỳ CV dùng để vẽ/tính. Để trống = chu kỳ cuối (ổn định nhất).",
     "chong": "Vẽ nhiều file cùng loại lên một hình để so sánh.",
     "noi_tiep": "Chỉ cho i-t (cần tick vẽ chồng): các file được nối đuôi nhau theo thứ tự, thời gian cộng dồn (file sau bắt đầu ngay khi file trước kết thúc) thay vì cùng bắt đầu từ 0.",
     "goi_nop_bai": "Kèm báo cáo Excel: Bảng nộp bài, Lặp lại (TB ± SD), Kiểm tra nộp bài, file methods_dien_hoa.txt và goi_tai_lap.zip (dữ liệu thô + kết quả + thông số).",
-    "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel, ECSA, cảnh báo và thông số đã dùng.",
+    "tafel": "Vùng mật độ dòng (mA/cm²) dùng để fit đường Tafel (E theo log|J|) trên đường LSV/CV.\nVới LSV có pic nhỏ, app chỉ lấy nhánh đi lên sau cùng.\n(Tafel từ Qs-LSV: dùng công cụ Qs-LSV.)",
+    "tafel_e": "Vùng điện thế (V) dùng để fit Tafel, ví dụ 1.40 đến 1.55. Chọn 'Theo điện thế' ở bên trái. Cần ít nhất 3 điểm trong vùng.",
+    "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel (từ Qs-LSV), ECSA, cảnh báo và thông số đã dùng.",
     "i_muc_tieu": "Các mật độ dòng mục tiêu (mA/cm²) để báo cáo điện thế/quá thế, cách nhau dấu phẩy. Ví dụ: 10, 100.",
     "e_can_bang": "Điện thế cân bằng (V vs RHE) để tính quá thế. OER: 1.23 V; HER: 0 V.",
     "le_max": "Khoảng cách từ dữ liệu lớn nhất đến đầu trục, tính theo số bước chia chính (0.5 = nửa bước).",
@@ -108,6 +111,8 @@ GOI_Y = {
     "co_chu": "Cỡ chữ của các số trên trục (pt).",
     "co_chu_td": "Cỡ chữ tiêu đề trục. Để trống = bằng cỡ chữ số trên trục.",
     "co_chu_ct": "Cỡ chữ chú thích. Để trống = 85% cỡ chữ tiêu đề.",
+    "khong_doi_khung": "Không đặt lại kích thước/vị trí khung đồ thị (giữ nguyên của template Origin). Thử tick nếu hình còn gạch trên chữ.",
+    "khong_chinh_chu": "Không chỉnh cỡ chữ tiêu đề trục / chú thích bằng app (giữ cỡ mặc định của Origin). Thử tick nếu hình Origin còn gạch trên đầu chữ.",
     "vc_dai": "Chiều dài vạch chia chính (pt).",
     "vp_so": "Số vạch phụ giữa 2 vạch chính. 0 = không có vạch phụ.",
     "r_s": "Điện trở dung dịch Rs (Ω) để bù iR: E thật = E đo − i × Rs. 0 = không bù.\nLấy từ EIS đo cùng điều kiện (nút 'Lấy Rs từ EIS'). i là dòng đo thực (A) chưa chia diện tích.",
@@ -127,10 +132,9 @@ GOI_Y = {
     "qs_duoi": "Lấy trung bình bao nhiêu % điểm cuối của mỗi bước (giảm nhiễu). 0 = chỉ lấy đúng điểm cuối cùng.",
     "qs_da_rhe": "Tick nếu E trong file Qs-LSV đã là RHE (app sẽ không cộng pH và Eref nữa).",
     "tof_rhe": "Tick nếu cửa sổ điện thế ở trên là điện thế đã quy đổi sang RHE (theo pH và Eref ở tab Dữ liệu) thay vì điện thế ghi trong file.",
-    "so_sanh": "Xuất bảng xếp hạng và biểu đồ cột so sánh các mẫu: quá thế, Tafel, hoạt độ khối, TOF (so_sanh_tong_hop.png/.csv).",
+    "so_sanh": "Xuất bảng xếp hạng và biểu đồ cột so sánh các mẫu: quá thế, Tafel (từ Qs-LSV), hoạt độ khối, TOF (so_sanh_tong_hop.png/.csv).",
     "khong_rhe": "Dùng cho phép đo hai điện cực (điện thế tế bào, vd 1.61 V để đạt 10 mA/cm²): giữ nguyên E đo, không cộng 0.0592×pH + Eref.",
     "khong_qua_the": "Phản ứng không có điện thế cân bằng rõ ràng (vd oxi hóa glucose): bỏ cột quá thế, xếp hạng theo điện thế tại dòng mục tiêu.",
-    "tafel_e": "Vùng điện thế (V) dùng để fit Tafel, ví dụ 1.40 đến 1.55. Chọn 'Theo điện thế' ở bên trái. Cần ít nhất 3 điểm trong vùng.",
     "tai_lieu": "File CSV các nghiên cứu khác (cột: Xúc tác, Điện giải, E tại 10 mA/cm² (V vs RHE), Tafel (mV/dec), Tài liệu). App ghép với kết quả của bạn thành sheet 'So sánh tài liệu'.",
     "fe_v_h2": "Thể tích khí thu được (mL) bằng phương pháp dời nước, theo thứ tự các file IT, cách nhau dấu phẩy. VD: 3.2, 4.0. Để trống = không tính FE.\nFE = n·F·n_khí / Q × 100%, Q = ∫|i|dt.",
     "fe_n": "Số electron mỗi phân tử khí: H₂ = 2, O₂ = 4.",
@@ -138,7 +142,7 @@ GOI_Y = {
     "fe_ap_suat": "Áp suất khí quyển (kPa), mặc định 101.325.",
     "fe_hoi_nuoc": "Khí thu bằng cách dời nước bão hòa hơi nước; trừ áp suất hơi nước (công thức Tetens) để có áp suất riêng phần của khí.",
     "fit_eis": "Fit mô hình Rs + (Rct ‖ CPE) bằng Levenberg–Marquardt: xuất Rs, Rct, Q, n, C_eff và sai số; vẽ Nyquist có đường fit.",
-    "hinh_bai_bao": "Ghép các hình (LSV, Tafel, Nyquist, i–t, cột so sánh) thành một hình nhiều ô, đúng khổ cột tạp chí, xuất PNG/PDF/TIFF.",
+    "hinh_bai_bao": "Ghép các hình (LSV, Nyquist, i–t, cột so sánh) thành một hình nhiều ô, đúng khổ cột tạp chí, xuất PNG/PDF/TIFF.",
     "hinh_o": "Danh sách ô của từng hình (soạn bằng nút 'Soạn hình & tên mẫu'). Để trống = tự chọn theo dữ liệu.",
     "pho_doi": "Khoảng cách giữa các phổ khi xếp chồng (1.1 = hơn một chiều cao phổ chuẩn hóa).",
     "pho_dinh": "Số đỉnh cao nhất được ghi giá trị x trên mỗi phổ (0 = không ghi).",
@@ -276,7 +280,9 @@ class CongCuQsTof:
         fb.grid(row=4, column=0, sticky="w", padx=10, pady=4)
         self.nut = ttk.Button(fb, text="▶  Tính Qs-LSV & vẽ TOF", command=self.chay)
         self.nut.pack(side="left", ipadx=14, ipady=3)
-        ttk.Button(fb, text="Xem hình", command=self.xem_hinh).pack(side="left", padx=6)
+        ttk.Button(fb, text="Tafel từ Qs-LSV...", command=self.mo_tafel).pack(side="left", padx=6)
+        ttk.Button(fb, text="Cdl nhiều mẫu (ECSA)...", command=self.mo_cdl).pack(side="left", padx=2)
+        ttk.Button(fb, text="Xem hình", command=self.xem_hinh).pack(side="left", padx=2)
         ttk.Button(fb, text="Mở thư mục kết quả", command=lambda: self.app.mo_duong_dan(self.ra.get())).pack(side="left", padx=2)
         ttk.Button(fb, text="Đóng", command=w.destroy).pack(side="left", padx=2)
         w.rowconfigure(5, weight=1)
@@ -366,7 +372,7 @@ class CongCuQsTof:
         self.log.see("end")
         self.log.config(state="disabled")
 
-    def lenh(self):
+    def lenh(self, chi_qs=False):
         a = self.app
         if not self.mau:
             raise ValueError("Chưa có mẫu CV nào (bấm 'Thêm CV...').")
@@ -421,6 +427,8 @@ class CongCuQsTof:
         if a.qs_da_rhe.get():
             c.append("--qs-da-rhe")
         c += ["--thu-muc-ra", os.path.abspath(self.ra.get()), "--khong-canh-bao"]
+        if chi_qs:                                   # chỉ đọc Qs-LSV (cho Tafel): không tính Q/TOF, không vẽ
+            return [("Đọc dữ liệu Qs-LSV", c + ["--chi-qs", "--khong-ve"])]
         if not a.qs_origin.get() and not a.qs_matplotlib.get():
             raise ValueError("Hãy tick ít nhất một cách vẽ: Origin hoặc Matplotlib.")
         pre = a.lenh_con("xu_ly_dien_hoa.py", "--worker-csv")
@@ -436,14 +444,16 @@ class CongCuQsTof:
             lenhs.append(("Tính & vẽ bằng Matplotlib", c if not a.qs_origin.get() else c + ["--khong-ve"]))
         return lenhs
 
-    def chay(self):
+    def chay(self, chi_qs=False, sau=None):
         if self.dang:
             return
         try:
-            lenhs = self.lenh()
+            lenhs = self.lenh(chi_qs)
         except ValueError as e:
             messagebox.showwarning("Qs-LSV & TOF", str(e), parent=self.w)
             return
+        self.sau = sau
+        self.chi_qs = chi_qs
         self.dang = True
         self.nut.config(state="disabled", text="Đang tính...")
         self.log.config(state="normal")
@@ -475,7 +485,11 @@ class CongCuQsTof:
                     self.dang = False
                     self.nut.config(state="normal", text="▶  Tính Qs-LSV & vẽ TOF")
                     self.ghi("\n>>> HOÀN THÀNH\n" if v[1] == 0 else "\n>>> CÓ LỖI (xem các dòng ở trên)\n")
-                    if v[1] == 0 and os.path.isfile(os.path.join(self.ra.get(), "TOF_QsLSV.png")):
+                    sau, self.sau = getattr(self, "sau", None), None
+                    chi, self.chi_qs = getattr(self, "chi_qs", False), False
+                    if v[1] == 0 and sau:
+                        sau()
+                    elif v[1] == 0 and not chi and os.path.isfile(os.path.join(self.ra.get(), "TOF_QsLSV.png")):
                         self.xem_hinh()
                 else:
                     self.ghi(v)
@@ -486,6 +500,74 @@ class CongCuQsTof:
                 self.w.after(150, self.doc_hang_doi)
         except tk.TclError:
             pass
+
+    # ---- Cdl nhiều mẫu (thư mục ECSA)
+    def mo_cdl(self):
+        w = getattr(self, "w_cdl", None)
+        try:
+            if w is not None and w.w.winfo_exists():
+                w.w.lift()
+                return
+        except tk.TclError:
+            pass
+        try:
+            import cdl_nhieu_gui
+            self.w_cdl = cdl_nhieu_gui.CuaSoCdlNhieu(self.app, os.path.join(self.ra.get(), "Cdl_nhieu"))
+        except Exception as e:
+            messagebox.showerror("Cdl nhiều mẫu", "Không mở được công cụ:\n" + str(e) +
+                                 "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file cdl_nhieu.py / cdl_nhieu_gui.py.", parent=self.w)
+
+    # ---- Tafel từ Qs-LSV
+    def doc_qs(self, sau=None):
+        """Chạy lại việc đọc Qs-LSV (chỉ ghi QsLSV_<nhãn>.csv) rồi gọi sau()."""
+        self.chay(chi_qs=True, sau=sau)
+
+    def mo_tafel(self):
+        if getattr(self, "dang", False):
+            return
+        if not self.mau:
+            messagebox.showinfo("Tafel", "Chưa có mẫu nào (bấm 'Thêm CV...' và gán dữ liệu Qs-LSV).", parent=self.w)
+            return
+        thu_muc = os.path.abspath(self.ra.get())
+
+        def mo():
+            w = getattr(self, "w_tafel", None)
+            try:
+                if w is not None and w.w.winfo_exists():
+                    w.mau = [{"nhan": m["nhan"], "mau": m["mau"]} for m in self.mau]
+                    w.thu_muc = thu_muc
+                    w.nap()
+                    w.w.lift()
+                    return
+            except tk.TclError:
+                pass
+            import tafel_qs_gui
+            self.w_tafel = tafel_qs_gui.CuaSoTafelQs(
+                self.w, [{"nhan": m["nhan"], "mau": m["mau"]} for m in self.mau], thu_muc,
+                hanh_dong={"origin": self.tafel_origin, "mo": self.app.mo_duong_dan,
+                           "luu": lambda p: setattr(self.app, "tafel_qs_json", p)},
+                tai_lai=self.doc_qs)
+        if all(os.path.isfile(os.path.join(thu_muc, "QsLSV_" + "".join(c if c.isalnum() or c in "-_" else "_" for c in m["nhan"]) + ".csv")) for m in self.mau):
+            mo()
+        else:
+            self.doc_qs(mo)
+
+    def tafel_origin(self, p):
+        if self.dang:
+            return
+        a = self.app
+        try:
+            co = a.lenh_con("ve_origin.py", "--worker-origin") + [p, "--tafel-qs", "--thu-muc-ra", os.path.abspath(self.ra.get()), "--khong-canh-bao",
+                 "--co-chu", str(a.so(a.co_chu, "Cỡ chữ", int, duong=True)), "--day-net", str(a.so(a.day_net, "Dày nét", duong=True)),
+                 "--ti-le", str(a.so(a.ti_le, "Tỉ lệ", duong=True)), "--day-khung", str(a.so(a.day_khung, "Dày khung", duong=True)),
+                 "--le-max", str(a.so(a.le_max, "Đệm trục"))] + a.khoang_args() + a.chu_vach_args()
+        except ValueError as e:
+            messagebox.showwarning("Tafel", str(e), parent=self.w)
+            return
+        self.sau, self.chi_qs = None, True
+        self.dang = True
+        self.nut.config(state="disabled", text="Đang vẽ...")
+        threading.Thread(target=self.nen, args=([("Vẽ Tafel bằng Origin", co)],), daemon=True).start()
 
     def xem_hinh(self):
         p = os.path.join(self.ra.get(), "TOF_QsLSV.png")
@@ -742,7 +824,7 @@ class App:
         self.root = root
         self.dnd = dnd
         self.phien_ban = cn.doc_phien_ban_cuc_bo(THU_MUC) if cn else 0
-        root.title(f"Echem Studio - Xử lý & vẽ số liệu điện hóa (LSV · CV · IT · EIS · ECSA · Tafel)  -  phiên bản {self.phien_ban}")
+        root.title(f"Echem Studio - Xử lý & vẽ số liệu điện hóa (LSV · CV · IT · EIS · ECSA · Tafel · Qs-LSV · Siêu tụ/Pin)  -  phiên bản {self.phien_ban}")
         root.minsize(560, 420)
         cd = self.doc_cai_dat()
         root.report_callback_exception = self.loi_khong_mong_doi
@@ -820,6 +902,10 @@ class App:
         self.cua_so_main = self.canvas.create_window((0, 0), window=main, anchor="nw")
         main.bind("<Configure>", lambda e: self.cap_nhat_cuon())
         self.canvas.bind("<Configure>", lambda e: self.cap_nhat_cuon())
+        if gd:
+            gd.ap_kieu(self.root)
+            dau = gd.dai_logo(main, "Echem Studio", f"Xử lý & vẽ số liệu điện hóa  ·  phiên bản {self.phien_ban}", kich_thuoc=40)
+            dau.pack(fill="x", padx=4, pady=(2, 4))
 
         # ================= THANH CÔNG CỤ (ribbon): bấm tên nhóm để mở/đóng =================
         self.tabbar = ttk.Frame(main)
@@ -880,7 +966,10 @@ class App:
         # ================= NÚT CHẠY =================
         fb = ttk.Frame(main)
         fb.pack(fill="x", **pad)
-        self.nut_chay = ttk.Button(fb, text="▶  CHẠY XỬ LÝ & VẼ", command=self.bam_chay)
+        if gd:
+            self.nut_chay = gd.nut_chinh(fb, "▶  CHẠY XỬ LÝ & VẼ", self.bam_chay)
+        else:
+            self.nut_chay = ttk.Button(fb, text="▶  CHẠY XỬ LÝ & VẼ", command=self.bam_chay)
         self.nut_chay.pack(side="left", ipadx=20, ipady=5)
         self.nut_dung = ttk.Button(fb, text="Dừng", command=self.bam_dung, state="disabled")
         self.nut_dung.pack(side="left", padx=(6, 0), ipady=5)
@@ -906,6 +995,8 @@ class App:
         self.log.tag_configure("canh_bao", foreground="#b45f06")
         self.log.tag_configure("loi", foreground="#c00000")
         self.log.tag_configure("tot", foreground="#1b7f3b")
+        if gd:
+            gd.kieu_nhat_ky(self.log)
 
         r = self.root
         r.bind_all("<Control-MouseWheel>", lambda e: (self.doi_zoom(10 if e.delta > 0 else -10), "break")[1])
@@ -978,13 +1069,14 @@ class App:
         h1.pack(fill="x")
         h2 = ttk.Frame(tab)
         h2.pack(fill="x")
-        g = self.nhom_ribbon(h1, "Tafel")
+        g = self.nhom_ribbon(h1, "Tafel (loại = Tafel)")
         ttk.Radiobutton(g, text="Theo dòng (mA/cm²)", value="dong", variable=self.tafel_che_do).grid(row=0, column=0, columnspan=4, sticky="w", padx=6)
         self.en_tf_min = self.o_nhap(g, "từ", self.tafel_min, 5, "tafel", 1, 0)
         self.en_tf_max = self.o_nhap(g, "đến", self.tafel_max, 5, "tafel", 1, 2)
         ttk.Radiobutton(g, text="Theo điện thế (V)", value="e", variable=self.tafel_che_do).grid(row=2, column=0, columnspan=4, sticky="w", padx=6)
         self.o_nhap(g, "từ", self.tafel_e_min, 5, "tafel_e", 3, 0)
         self.o_nhap(g, "đến", self.tafel_e_max, 5, "tafel_e", 3, 2)
+        ttk.Button(g, text="Tafel từ Qs-LSV...", command=self.mo_cong_cu_qs).grid(row=4, column=0, columnspan=4, padx=6, pady=(4, 2), sticky="w")
         g = self.nhom_ribbon(h1, "ECSA (loại = ECSA)")
         self.en_e_ecsa = self.o_nhap(g, "E lấy dòng (V)", self.e_ecsa, 6, "e_ecsa", 0, 0)
         self.en_cs = self.o_nhap(g, "Cs (mF/cm²)", self.cs, 6, "cs", 1, 0)
@@ -1038,6 +1130,8 @@ class App:
         self.o_nhap(g, "Số trên trục", self.co_chu, 5, "co_chu", 0, 0)
         self.o_nhap(g, "Tiêu đề trục", self.co_chu_td, 5, "co_chu_td", 0, 2)
         self.o_nhap(g, "Chú thích", self.co_chu_ct, 5, "co_chu_ct", 0, 4)
+        self.tick(g, "Không chỉnh cỡ chữ tiêu đề/chú thích (thử nếu còn gạch trên chữ)", self.khong_chinh_chu, "khong_chinh_chu", row=3, column=0, columnspan=6, sticky="w", padx=6)
+        self.tick(g, "Không đổi kích thước khung (thử nếu còn gạch trên chữ)", self.khong_doi_khung, "khong_doi_khung", row=4, column=0, columnspan=6, sticky="w", padx=6)
         self.o_nhap(g, "Vạch chính: dài", self.vc_dai, 5, "vc_dai", 1, 0)
         self.o_nhap(g, "dày", self.vc_day, 5, None, 1, 2)
         self.o_nhap(g, "Vạch phụ: số", self.vp_so, 5, "vp_so", 2, 0)
@@ -1062,7 +1156,7 @@ class App:
         cc.grid(row=0, column=2, padx=4)
         for c, (bt, ten, lenh) in enumerate((("ℹ", "Xem quy cách chi tiết của tạp chí đã chọn (số đo, cỡ chữ, nguồn)", lambda: hg.mo_quy_cach(self)),
                                              ("⚙", "Định dạng PNG/PDF/TIFF, dpi, chữ ô", lambda: hg.mo_tuy_chon(self)),
-                                             ("🧩", "Soạn hình & tên mẫu: chọn ô (LSV, Tafel, EIS, i-t, cột) cho từng hình", self.soan_hinh))):
+                                             ("🧩", "Soạn hình & tên mẫu: chọn ô (LSV, EIS, i-t, cột) cho từng hình", self.soan_hinh))):
             b = ttk.Button(g, text=bt, width=3, command=lenh)
             b.grid(row=0, column=3 + c, padx=2)
             GoiY(b, ten)
@@ -1288,7 +1382,7 @@ class App:
         nhan_truc = {"LSV": ("E (V vs RHE)", "I (mA/cm²)"), "CV": ("E (V vs RHE)", "I (mA/cm²)"),
                      "IT": ("T (h)", "I (mA/cm²)"), "EIS": ("Z' (Ω)", "-Z'' (Ω)"),
                      "ECSA": ("E (V vs RHE)", "I (mA/cm²)"), "Tafel": ("Log(J)", "E (V vs RHE)")}
-        nx, ny = next((v for k, v in nhan_truc.items() if loai_val.startswith(k)), ("E / T / Z' / Log(J)", "I / -Z'' / E"))
+        nx, ny = next((v for k, v in nhan_truc.items() if loai_val.startswith(k)), ("E / T / Z'", "I / -Z''"))
         self.nhan_truc_x.set(f"Trục X - {nx}")
         self.nhan_truc_y.set(f"Trục Y - {ny}")
         ecsa = loai_val.startswith("ECSA")
@@ -1811,7 +1905,9 @@ class App:
         return [python_exe(), "-u", os.path.join(THU_MUC, ten_script)]
 
     def chu_vach_args(self):
-        kq = []
+        kq = ["--khong-chinh-chu"] if self.khong_chinh_chu.get() else []
+        if self.khong_doi_khung.get():
+            kq.append("--khong-doi-khung")
         for k, co, ten, kieu, duong in (
                 ("co_chu_td", "--co-chu-td", "Cỡ chữ tiêu đề", int, True),
                 ("co_chu_ct", "--co-chu-ct", "Cỡ chữ chú thích", int, True),
@@ -1849,18 +1945,13 @@ class App:
         ecsa = loai.startswith("ECSA")
         tafel = loai.startswith("Tafel")
 
+        tafel_min = self.so(self.tafel_min, "Tafel: dòng từ")
+        tafel_max = self.so(self.tafel_max, "Tafel: dòng đến")
         ph = self.so(self.ph, "pH")
         eref = self.so(self.eref, "Eref")
         nhan_i = self.so(self.nhan_i, "hệ số nhân I", duong=True)
         chia_i = self.so(self.chia_i, "hệ số chia I", duong=True)
         chung = ["--ph", str(ph), "--eref", str(eref), "--nernst", str(self.so(self.nernst, "hệ số Nernst", duong=True)), "--nhan-i", str(nhan_i), "--chia-i", str(chia_i)]
-        if self.chu_ky.get().strip():
-            chung += ["--chu-ky", str(self.so(self.chu_ky, "Chu kỳ CV", int, duong=True))]
-        thu_muc = os.path.abspath(self.thu_muc_ra.get())
-
-        pho = loai.startswith("Phổ")
-        tafel_min = self.so(self.tafel_min, "Tafel: dòng từ")
-        tafel_max = self.so(self.tafel_max, "Tafel: dòng đến")
         chung += ["--tafel-min", str(tafel_min), "--tafel-max", str(tafel_max)]
         if self.tafel_che_do.get() == "e":
             e1 = self.so(self.tafel_e_min, "Tafel: điện thế từ")
@@ -1868,6 +1959,14 @@ class App:
             if e1 >= e2:
                 raise ValueError("Tafel theo điện thế: 'từ' phải nhỏ hơn 'đến'.")
             chung += ["--tafel-e-min", str(e1), "--tafel-e-max", str(e2)]
+        if self.chu_ky.get().strip():
+            chung += ["--chu-ky", str(self.so(self.chu_ky, "Chu kỳ CV", int, duong=True))]
+        thu_muc = os.path.abspath(self.thu_muc_ra.get())
+
+        pho = loai.startswith("Phổ")
+        p_tf = getattr(self, "tafel_qs_json", None) or os.path.join(thu_muc, "Qs_LSV_TOF", "Tafel_QsLSV.json")
+        if os.path.isfile(p_tf):                      # Tafel (Qs-LSV) đã lưu: điền cột Tafel của so sánh / nộp bài / báo cáo
+            chung += ["--tafel-qs-json", p_tf]
         if self.khong_rhe.get():
             chung.append("--khong-rhe")
         if self.khong_qua_the.get():
@@ -2414,8 +2513,8 @@ class App:
                     so_file[k] = so_file.get(k, 0) + 1
         return {"ph": g("ph"), "eref": g("eref"), "nernst": g("nernst"), "nhan_i": g("nhan_i"), "chia_i": g("chia_i"), "r_s": g("r_s"), "ir_pct": g("ir_pct"),
                 "khong_rhe": g("khong_rhe"), "i_muc_tieu": g("i_muc_tieu"), "e_can_bang": g("e_can_bang"), "chu_ky": g("chu_ky"),
-                "noi_tiep": g("noi_tiep"), "cs": g("cs"), "e_ecsa": g("e_ecsa"), "tafel_che_do": g("tafel_che_do") or "dong",
-                "tafel_min": g("tafel_min"), "tafel_max": g("tafel_max"), "tafel_e_min": g("tafel_e_min"), "tafel_e_max": g("tafel_e_max"),
+                "noi_tiep": g("noi_tiep"), "cs": g("cs"), "e_ecsa": g("e_ecsa"),
+                "tafel_min": g("tafel_min"), "tafel_max": g("tafel_max"),
                 "so_file": so_file}
 
     def mo_huong_dan_phep_do(self, tu=""):
@@ -2523,7 +2622,7 @@ class App:
         except Exception:
             pass
         ttk.Label(w, text="Echem Studio", font=("TkDefaultFont", 14, "bold")).pack()
-        ttk.Label(w, text="Xử lý & vẽ số liệu điện hóa: LSV · CV · IT · EIS · ECSA · Tafel").pack()
+        ttk.Label(w, text="Xử lý & vẽ số liệu điện hóa: LSV · CV · IT · EIS · ECSA · Tafel · Qs-LSV · Siêu tụ/Pin").pack()
         ttk.Label(w, text=f"Phiên bản mã nguồn: {self.phien_ban}").pack(pady=(6, 0))
         kho = f"{cn.GITHUB_USER}/{cn.GITHUB_REPO}" if cn else "?"
         ttk.Label(w, text=f"Kho mã nguồn: github.com/{kho}", foreground="#1a5fd8").pack()
@@ -2606,6 +2705,8 @@ def main():
         root.iconbitmap(os.path.join(THU_MUC, "logo.ico"))
     except Exception:
         pass
+    if gd:
+        gd.cai_logo_toan_app(root)      # mọi cửa sổ con / hộp thoại tạo sau đó đều mang logo của app
     app = App(root, dnd)
     app.kiem_file_ma_nguon()
     root.mainloop()

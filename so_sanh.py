@@ -4,7 +4,8 @@ SO SÁNH CÁC MẪU + HOẠT ĐỘ KHỐI (mass activity) + TOF.
 
 Với mỗi mẫu CV/LSV tính:
   • E và quá thế (η = E - E_cân_bằng) tại các mật độ dòng mục tiêu (mặc định 10 mA/cm²), lấy giao điểm SAU CÙNG
-  • hệ số Tafel (mV/dec) trong vùng dòng đã chọn
+  • hệ số Tafel (mV/dec) trong vùng dòng đã chọn (fit trên đường LSV/CV)
+  • hệ số Tafel Qs-LSV (mV/dec): lấy từ công cụ Qs-LSV (khớp theo nhãn mẫu; trống nếu chưa chạy)
   • tại các quá thế khảo sát η_ht (mặc định 300 mV): mật độ dòng J, hoạt độ khối (A/g) và TOF (s⁻¹)
 Rồi xếp hạng theo η (thấp = tốt) và vẽ biểu đồ cột so sánh.
 
@@ -115,6 +116,9 @@ def tinh_mot_mau(m, a, ds_j, ds_eta):
     except Exception as e:
         h["Tafel (mV/dec)"] = None
         print(f"  (luu y) khong tinh duoc Tafel cho {m['nhan']}: {e}")
+    import tafel_qs                                    # Tafel Qs-LSV: lấy kết quả đã lưu (khớp theo nhãn mẫu); chưa chạy thì để trống
+    tb = tafel_qs.cua(m["nhan"])
+    h["Tafel Qs-LSV (mV/dec)"] = abs(tb["he_so_Tafel (mV/dec)"]) if tb else None
     for eta in (ds_eta if e_cb is not None else []):
         e0 = e_cb + chieu * abs(eta) / 1000.0
         j = j_tai_e(d, e0)
@@ -132,7 +136,7 @@ def tong_hop(muc, a):
     ds_eta = _ds_so(getattr(a, "qua_the_ht", "300"), [300.0])
     hang = []
     for m in muc:
-        if m["loai"] in ("CV", "LSV", "TAFEL"):
+        if m["loai"] in ("CV", "LSV"):
             try:
                 hang.append(tinh_mot_mau(m, a, ds_j, ds_eta))
             except Exception as e:

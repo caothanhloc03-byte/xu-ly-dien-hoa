@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Xử lý file điện hóa thô và VẼ TRỰC TIẾP TRONG ORIGIN (Origin 2022 trở lên).
-Hỗ trợ vẽ Nyquist EIS so sánh, CV ECSA đa tốc độ quét và Biểu đồ Tafel.
+Hỗ trợ vẽ Nyquist EIS so sánh, CV ECSA đa tốc độ quét, Qs-LSV/TOF và Tafel từ Qs-LSV.
 """
 import argparse
+import math
 import os
 import sys
 
@@ -79,6 +80,9 @@ def phien_ban_origin():
         return None
     ten = {9.8: "2021", 9.9: "2022", 10.0: "2023", 10.1: "2024", 10.2: "2025"}.get(round(v, 1), "")
     print(f"  Origin phien ban noi bo {v:g}" + (f" (Origin {ten})" if ten else ""))
+    if 10.1 <= v < 10.1004:                       # Origin 2024 (ban dau): loi cua Origin ve gach tren moi chu, da sua tu Origin 2024b
+        print("  (canh bao) Origin 2024 ban dau co loi hien thi dau gach tren moi chu (tieu de truc, chu thich, nhan). "
+              "Day la loi cua Origin, khong phai cua app; hay cap nhat len Origin 2024b tro len (Help > Check for Updates).")
     if v < 9.75:
         print("  (canh bao) Origin cu hon 2021: thu vien originpro can Origin 2021 tro len - hinh co the khong ve duoc.")
     return v
@@ -139,6 +143,8 @@ def dinh_dang_khung(gl, a):
         cac_lenh += [f"layer.x.mticklength={a.vach_phu_dai}", f"layer.y.mticklength={a.vach_phu_dai}"]
     for c in cac_lenh:
         lt(gl, c + ";")
+    if getattr(a, "khong_doi_khung", False):               # thu nghiem (gach tren chu): giu nguyen kich thuoc khung cua template
+        return
     lt(gl, f"double dPW=page.width; double dPH=page.height; layer.unit=1; "
            f"layer.width=min(76, 72*dPH/dPW*{a.ti_le}); layer.height=layer.width*dPW/(dPH*{a.ti_le}); "
            f"layer.left=17; layer.top=8;")
@@ -204,14 +210,39 @@ def dinh_dang_chu(gl, a, so_duong=0, chu_thich=True):
             print(f"  (canh bao) khong dat duoc noi dung chu thich: {e}")
 
 
+def lam_sach_chu(gl):
+    """Bo moi chuoi \\ab(...) (dau gach TREN chu) con sot trong tieu de truc / chu thich; in noi dung that cua tung chu thich de chan doan."""
+    import re
+    for ten in ("XB", "YL", "XT", "YR", "Legend"):
+        try:
+            o = gl.label(ten)
+            if not o:
+                continue
+            t = o.text
+            if t and re.search(r"\\a[bdt]\(", t):
+                moi = re.sub(r"\\a[bdt]\(([^()]*)\)", r"\1", t)
+                o.text = moi
+                print(f"  (da go gach tren chu) {ten}: {t!r} -> {moi!r}")
+            elif ten != "Legend":
+                print(f"  [chu] {ten}: {t!r}")
+        except Exception as e:
+            print(f"  (canh bao) khong doc duoc chu {ten}: {e}")
+
+
 def hoan_tat_hinh(gp, gl, a, thu_muc, ten, nhan_x, nhan_y, log_x=False, chu_thich=True,
-                  x_max=None, y_max=None, so_duong=0, khoang=None):
+                  x_max=None, y_max=None, so_duong=0, khoang=None, truoc_luu=None):
     dat_truc(gl, nhan_x, nhan_y, log_x)
     if not log_x:
         dat_khoang_truc(gl, x_max, y_max, a.le_max, khoang)
     dinh_dang_khung(gl, a)
     if not a.khong_chinh_chu:
         dinh_dang_chu(gl, a, so_duong, chu_thich)
+    lam_sach_chu(gl)
+    if truoc_luu:
+        try:
+            truoc_luu(gl)
+        except Exception as e:
+            print(f"  (canh bao) khong hoan tat duoc chu thich/nhan: {e}")
     duong = os.path.join(thu_muc, ten + ".png")
     gp.save_fig(duong, width=a.rong)
     print(f"  hinh: {duong}")
@@ -237,23 +268,6 @@ def ve_cv_lsv_chong(loai, muc, a):
 
 
 # ====================== IT ======================
-def ve_it_chong(muc, a):
-    ten = "So_sanh_IT"
-    _, wks = tao_so(ten)
-    xs, ys = [], []
-    for k, (m, t, i) in enumerate(xl.duong_it(muc, a.noi_tiep)):
-        xs.append(t)
-        ys.append(i)
-        ghi_cot(wks, 2 * k, t, "T", "h", m["nhan"], "X")
-        ghi_cot(wks, 2 * k + 1, i, m["nhan"], "mA/cm2", m["nhan"], "Y")
-    gp = tao_do_thi(ten, a.template)
-    gl = gp[0]
-    for k, m in enumerate(muc):
-        them_duong(gl, wks, 2 * k, 2 * k + 1, m["mau"], a)
-    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "T (h)", xl.NHAN_I,
-                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(muc), khoang=khoang_tu_args(a))
-
-
 def ve_tafel_chong(muc, a):
     ten = "So_sanh_Tafel"
     _, wks = tao_so(ten)
@@ -275,6 +289,24 @@ def ve_tafel_chong(muc, a):
         them_duong(gl, wks, 4 * k, 4 * k + 1, m["mau"], a, kieu=201)        # diem
         them_duong(gl, wks, 4 * k + 2, 4 * k + 3, m["mau"], a, kieu=200)    # duong fit
     hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Log(J)", xl.NHAN_POT,
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(muc), khoang=khoang_tu_args(a))
+
+
+
+def ve_it_chong(muc, a):
+    ten = "So_sanh_IT"
+    _, wks = tao_so(ten)
+    xs, ys = [], []
+    for k, (m, t, i) in enumerate(xl.duong_it(muc, a.noi_tiep)):
+        xs.append(t)
+        ys.append(i)
+        ghi_cot(wks, 2 * k, t, "T", "h", m["nhan"], "X")
+        ghi_cot(wks, 2 * k + 1, i, m["nhan"], "mA/cm2", m["nhan"], "Y")
+    gp = tao_do_thi(ten, a.template)
+    gl = gp[0]
+    for k, m in enumerate(muc):
+        them_duong(gl, wks, 2 * k, 2 * k + 1, m["mau"], a)
+    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "T (h)", xl.NHAN_I,
                   x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(muc), khoang=khoang_tu_args(a))
 
 
@@ -347,6 +379,126 @@ def ve_qs_tof(a, ds):
             them_duong(gl, wks, 2 * k, 2 * k + 1, c["m"]["mau"], a, kieu=202)      # duong + diem
         hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Potential (V vs RHE)", nhan_y,
                       x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(cac), khoang=khoang_tu_args(a))
+
+
+def ve_tafel_qs(a, duong_dan):
+    """Hình Tafel từ Qs-LSV (Qs_Tafel): điểm đã dùng để fit + đường fit của từng mẫu; trục x = log|J|, trục y = E (V vs RHE) hoặc η (mV).
+    duong_dan: JSON do tafel_qs.luu_diem_json ghi."""
+    import json
+    import numpy as np
+    import tafel_qs
+    with open(duong_dan, encoding="utf-8") as f:
+        dl = json.load(f)
+    cac = dl["mau"]
+    if not cac:
+        print("  (canh bao) khong co mau nao fit duoc Tafel de ve.")
+        return
+    ky, e0 = dl.get("kieu_y", "e"), dl.get("e0", 0.0)
+    ten = "Qs_Tafel"
+    _, wks = tao_so(ten)
+    xs, ys = [], []
+    for k, c in enumerate(cac):
+        e, j, dung = np.array(c["e"]), np.array(c["j"]), np.array(c["dung"], bool)
+        lg = np.log10(np.abs(j[dung]))
+        y = tafel_qs.y_hien_thi(e[dung], ky, e0)
+        x_fit = np.array([c["log_j_min"], c["log_j_max"]])
+        y_fit = tafel_qs.y_hien_thi(c["a_V"] + c["b_mV"] / 1000.0 * x_fit, ky, e0)
+        xs += [lg, x_fit]
+        ys += [y, y_fit]
+        b = 4 * k
+        nh = f"{c['nhan']} ({abs(c['b_mV']):.1f} mV/dec)"
+        ghi_cot(wks, b, lg, "log|J|", "mA/cm2", c["nhan"], "X")
+        ghi_cot(wks, b + 1, y, c["nhan"], "V vs RHE" if ky == "e" else "mV", nh, "Y")
+        ghi_cot(wks, b + 2, x_fit, "log|J| fit", "mA/cm2", c["nhan"], "X")
+        ghi_cot(wks, b + 3, y_fit, c["nhan"] + " fit", "V vs RHE" if ky == "e" else "mV", nh, "Y")
+    gp = tao_do_thi(ten, a.template)
+    gl = gp[0]
+    for k, c in enumerate(cac):
+        them_duong(gl, wks, 4 * k, 4 * k + 1, c["mau"], a, kieu=201)        # điểm
+        them_duong(gl, wks, 4 * k + 2, 4 * k + 3, c["mau"], a, kieu=200)    # đường fit
+    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "log |J| (mA cm\u207b\u00b2)", "Potential (V vs RHE)" if ky == "e" else "Overpotential (mV)",
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=2 * len(cac), khoang=khoang_tu_args(a))
+
+
+# ====================== CDL NHIỀU MẪU ======================
+def ve_cdl_nhieu(a, duong_dan):
+    """Hình Cdl nhiều mẫu (Cdl_nhieu): ΔJ theo tốc độ quét, điểm + đường fit từng mẫu. duong_dan: JSON do cdl_nhieu.ghi_json ghi."""
+    import numpy as np
+    import cdl_nhieu
+    dl = cdl_nhieu.doc_json(duong_dan)
+    cac = dl["mau"]
+    if not cac:
+        print("  (canh bao) khong co mau nao de ve Cdl.")
+        return
+    nhan_y, _ = cdl_nhieu.he_y(dl.get("don_vi_y", "A"))
+    don_vi = "mA/cm2" if nhan_y == 1.0 else "A/cm2"
+    ten = "Cdl_nhieu"
+    _, wks = tao_so(ten)
+    xs, ys = [], []
+    for k, c in enumerate(cac):
+        v = np.array(c["v"])
+        y = np.array(c["dj_mA"]) * nhan_y
+        xf = np.array([v.min(), v.max()])
+        yf = (c["cdl"] * xf + c["tung_mA"]) * nhan_y
+        xs += [v, xf]
+        ys += [y, yf]
+        b = 4 * k
+        nh = f"Cdl = {c['cdl']:.3g} mF/cm2"
+        ghi_cot(wks, b, v, "Scan rate", "V/s", c["nhan"], "X")
+        ghi_cot(wks, b + 1, y, c["nhan"], don_vi, nh, "Y")
+        ghi_cot(wks, b + 2, xf, "Scan rate (fit)", "V/s", c["nhan"], "X")
+        ghi_cot(wks, b + 3, yf, c["nhan"] + " fit", don_vi, nh, "Y")
+    gp = tao_do_thi(ten, a.template)
+    gl = gp[0]
+    KY_HIEU_O = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]                      # vuong, tron, tam giac len/xuong, thoi... (moi mau 1 ky hieu)
+    for k, c in enumerate(cac):
+        pd_ = them_duong(gl, wks, 4 * k, 4 * k + 1, c["mau"], a, kieu=201)           # diem
+        try:
+            pd_.set_cmd(f"-k {KY_HIEU_O[k % len(KY_HIEU_O)]}")
+            pd_.symbol_size = max(a.co_diem, 9)
+        except Exception as e:
+            print(f"  (canh bao) khong dat duoc ky hieu: {e}")
+        pf = them_duong(gl, wks, 4 * k + 2, 4 * k + 3, c["mau"], a, kieu=200)        # duong fit: net dut
+        try:
+            pf.set_cmd("-d 1")
+        except Exception as e:
+            print(f"  (canh bao) khong dat duoc net dut: {e}")
+    kh = khoang_tu_args(a)
+    if kh["x"][0] is None:
+        kh["x"] = (0.0, kh["x"][1], kh["x"][2])
+    if kh["y"][0] is None:
+        kh["y"] = (0.0, kh["y"][1], kh["y"][2])
+
+    def chu_thich_va_nhan(gl_):
+        co_ct = a.co_chu_ct if a.co_chu_ct is not None else round((a.co_chu_td if a.co_chu_td is not None else (a.co_chu_so if a.co_chu_so is not None else a.co_chu)) * 0.85)
+        # chu thich: moi mau mot dong (chi diem, khong lap lai duong fit, khong ghi Cdl), cong thuc hoa hoc ha chi so duoi
+        try:
+            lg = gl_.label("Legend")
+            if lg:
+                lg.text = "\n".join(f"\\l({2 * k + 1}) {cdl_nhieu.cong_thuc_origin(c['nhan'])}" for k, c in enumerate(cac))
+        except Exception as e:
+            print(f"  (canh bao) khong dat duoc noi dung chu thich: {e}")
+        x0, x1 = gl_.get_float("x.from"), gl_.get_float("x.to")
+        y0, y1 = gl_.get_float("y.from"), gl_.get_float("y.to")
+        lt(gl_, f"legend.x={x0 + 0.03 * (x1 - x0)}; legend.y={y1 - 0.02 * (y1 - y0)}; legend.background=0;")
+        ti_le = a.ti_le                                           # chieu rong / chieu cao khung do thi
+        for k, c in enumerate(cac):
+            v = np.array(c["v"])
+            xa, xb = float(v.min()), float(v.max())
+            ya, yb = (c["cdl"] * xa + c["tung_mA"]) * nhan_y, (c["cdl"] * xb + c["tung_mA"]) * nhan_y
+            goc = math.degrees(math.atan2((yb - ya) / (y1 - y0), (xb - xa) / (x1 - x0) / ti_le))
+            xm = xa + 0.66 * (xb - xa)
+            ym = (c["cdl"] * xm + c["tung_mA"]) * nhan_y + 0.05 * (y1 - y0)
+            h = str(c["mau"] or "#000000").lstrip("#")
+            r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+            txt = f"C\\-(dl) = {cdl_nhieu.dinh_dang_cdl(c['cdl'])} mF.cm\\+(-2)"
+            nm = f"cdl{k + 1}"
+            tc = "" if a.khong_chinh_chu else f" {nm}.fsize={co_ct}; {nm}.bold=1;"
+            lt(gl_, f'label -a {xm} {ym} -n {nm} "{txt}"; {nm}.rotate={goc:.1f}; {nm}.color=color({r},{g},{b});{tc}')
+
+    hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Scan rate (V s\u207b\u00b9)", "\u0394J (" + ("mA" if nhan_y == 1.0 else "A") + " cm\u207b\u00b2)",
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(cac), khoang=kh, truoc_luu=chu_thich_va_nhan)
+    print("  Cdl (mF/cm2): " + "; ".join(f"{c['nhan']} = {c['cdl']:.3g}" for c in cac))
 
 
 # ====================== EIS SO SÁNH ======================
@@ -446,11 +598,14 @@ def main():
                     help="khoang cach tu du lieu lon nhat den dau truc, tinh theo buoc chia chinh")
     for ten in ("x-min", "x-max", "x-buoc", "y-min", "y-max", "y-buoc"):
         ap.add_argument("--" + ten, type=float, default=None)
+    ap.add_argument("--khong-doi-khung", action="store_true",
+                    help="khong dat lai kich thuoc/vi tri khung do thi (thu nghiem khi hinh Origin con gach tren chu)")
     ap.add_argument("--khong-chinh-chu", action="store_true",
                     help="khong chinh co chu tieu de/chu thich (dung de kiem tra loi gach tren chu)")
     ap.add_argument("--co-diem", type=float, default=8)
     ap.add_argument("--ti-le", type=float, default=1.28)
     ap.add_argument("--dong-origin", action="store_true")
+    ap.add_argument("--tafel-qs", action="store_true", help="file dau vao la JSON diem Tafel tu Qs-LSV (tafel_qs.luu_diem_json): ve hinh Qs_Tafel")
     a = ap.parse_args()
 
     ds = xl.mo_rong_file(a.files)
@@ -462,6 +617,18 @@ def main():
         op.set_show(True)
     phien_ban_origin()
 
+    if getattr(a, "cdl_nhieu", False):
+        ve_cdl_nhieu(a, ds[0])
+        op.save(os.path.join(a.thu_muc_ra, a.ten_du_an))
+        if a.dong_origin and getattr(op, "oext", False):
+            op.exit()
+        return
+    if getattr(a, "tafel_qs", False):
+        ve_tafel_qs(a, ds[0])
+        op.save(os.path.join(a.thu_muc_ra, a.ten_du_an))
+        if a.dong_origin and getattr(op, "oext", False):
+            op.exit()
+        return
     if getattr(a, "qs_tof", False):
         ve_qs_tof(a, ds)
         op.save(os.path.join(a.thu_muc_ra, a.ten_du_an))

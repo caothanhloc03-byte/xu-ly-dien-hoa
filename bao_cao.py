@@ -2,7 +2,7 @@
 """
 Xuất BÁO CÁO TỔNG HỢP (Excel .xlsx) cho mọi file đã xử lý:
   • Sheet "CV-LSV": Epa, Ipa, Epc, Ipc, E1/2, I max, điện thế (và quá thế) tại mật độ dòng mục tiêu
-  • Sheet "Tafel", "IT", "EIS", "ECSA" (tùy phép đo)
+  • Sheet "Tafel" (Tafel từ LSV/CV), "Tafel (Qs-LSV)" (nếu đã chạy Tafel trong công cụ Qs-LSV), "IT", "EIS", "ECSA" (tùy phép đo)
   • Sheet "Cảnh báo": các cảnh báo/gợi ý tự động
   • Sheet "Thông tin": thông số quy đổi, phiên bản, thời gian -> để tái lập kết quả
 
@@ -13,12 +13,13 @@ import datetime
 import os
 import platform
 
-LUU = {"tafel": [], "ecsa_diem": None, "ecsa": None, "so_sanh": None, "so_sanh_nhom": None, "so_sanh_tai_lieu": None, "fe": None, "fit_eis": None, "tof_cv": None}
+LUU = {"tafel": [], "tafel_qs": [], "ecsa_diem": None, "ecsa": None, "so_sanh": None, "so_sanh_nhom": None, "so_sanh_tai_lieu": None, "fe": None, "fit_eis": None, "tof_cv": None}
 TEN_FILE = "bao_cao_tong_hop"
 
 
 def reset():
     LUU["tafel"] = []
+    LUU["tafel_qs"] = []
     LUU["ecsa_diem"] = None
     LUU["ecsa"] = None
     for k in ("so_sanh", "so_sanh_nhom", "so_sanh_tai_lieu", "fe", "fit_eis", "tof_cv"):
@@ -104,6 +105,11 @@ def _bang_tafel():
              "Vùng dòng (mA/cm²)": t["vung_dong (mA/cm2)"]} for t in LUU["tafel"]]
 
 
+def _bang_tafel_qs():
+    return [{"Nhãn": t["nhan"], "Hệ số Tafel (mV/dec)": _so(t["he_so_Tafel (mV/dec)"], 2), "Sai số (mV/dec)": _so(t.get("sai_so (mV/dec)"), 2),
+             "R²": _so(t.get("R2"), 4), "Số điểm": t["so_diem"], "Vùng chọn": t["vung_dong (mA/cm2)"]} for t in LUU["tafel_qs"]]
+
+
 def _bang_ecsa():
     kq = []
     if LUU["ecsa"] is not None:
@@ -129,13 +135,14 @@ def _thong_tin(a, ds):
         ("Loại phép đo", getattr(a, "loai", None) or "Tự nhận dạng"),
         ("Chu kỳ CV dùng", getattr(a, "chu_ky", None) or "Chu kỳ cuối (mặc định)"),
         ("Vùng dòng Tafel (mA/cm²)", f"{getattr(a, 'tafel_min', '')} - {getattr(a, 'tafel_max', '')}"),
+        ("Vùng Tafel theo điện thế (V)", f"{getattr(a, 'tafel_e_min', '')} - {getattr(a, 'tafel_e_max', '')}" if getattr(a, "tafel_e_min", None) is not None else ""),
+        ("Tafel Qs-LSV", "Lấy từ công cụ Qs-LSV (fit E theo log|J| trên điểm Qs-LSV; vùng, số điểm ghi ở sheet 'Tafel (Qs-LSV)')"),
         ("Cs dùng cho ECSA (mF/cm²)", getattr(a, "cs", "")),
         ("Điện thế cân bằng dùng tính quá thế (V)", getattr(a, "e_can_bang", "")),
         ("Bù iR: Rs (Ω) / phần trăm bù", f"{getattr(a, 'r_s', 0) or 0} / {getattr(a, 'ir_phan_tram', 100)}"),
         ("Tải trọng xúc tác (mg/cm²)", getattr(a, "tai_trong", None) or ""),
         ("Số tâm hoạt động (µmol/cm²) / M (g/mol) / tỉ lệ tâm", f"{getattr(a, 'so_mol_tam', None) or ''} / {getattr(a, 'khoi_luong_mol', None) or ''} / {getattr(a, 'ti_le_tam', '')}"),
         ("Quá thế khảo sát (mV) / n electron", f"{getattr(a, 'qua_the_ht', '')} / {getattr(a, 'n_e', '')}"),
-        ("Vùng Tafel theo điện thế (V)", f"{getattr(a, 'tafel_e_min', '')} - {getattr(a, 'tafel_e_max', '')}" if getattr(a, "tafel_e_min", None) is not None else ""),
         ("Chế độ điện thế", "Điện thế tế bào (không quy đổi RHE)" if getattr(a, "khong_rhe", False) else "RHE"),
         ("FE: thể tích khí (mL) / T (°C) / P (kPa) / n", f"{getattr(a, 'fe_v_h2', None) or ''} / {getattr(a, 'fe_nhiet_do', '')} / {getattr(a, 'fe_ap_suat', '')} / {getattr(a, 'fe_n', '')}"),
         ("Số file", len(ds)),
@@ -194,8 +201,19 @@ def tao_noi_dung(a, ds):
             sheets.append(("IT", _bang_it(nc, nhom["IT"])))
         if nhom.get("EIS"):
             sheets.append(("EIS", _bang_eis(nc, nhom["EIS"])))
+        try:                                           # Tafel từ công cụ Qs-LSV: lấy kết quả đã lưu, khớp theo nhãn mẫu
+            import tafel_qs
+            LUU["tafel_qs"] = []
+            for _, nh in files:
+                b = tafel_qs.cua(nh)
+                if b and not any(x["nhan"] == b["nhan"] for x in LUU["tafel_qs"]):
+                    LUU["tafel_qs"].append(b)
+        except ImportError:
+            pass
         if loai_ep == "TAFEL" and LUU["tafel"]:
             sheets.append(("Tafel", _bang_tafel()))
+        if LUU["tafel_qs"]:
+            sheets.append(("Tafel (Qs-LSV)", _bang_tafel_qs()))
         if nhom.get("loi"):
             sheets.append(("Lỗi đọc file", nhom["loi"]))
     for khoa, ten_sheet in (("so_sanh", "So sánh mẫu"), ("so_sanh_nhom", "Nhóm (TB ± SD)"), ("so_sanh_tai_lieu", "So sánh tài liệu"),
@@ -270,7 +288,7 @@ def xuat(a, ds, thu_muc):
     if nop:
         try:
             import nop_bai
-            nop_bai.tao(sheets, a, ds, thu_muc, LUU["tafel"])
+            nop_bai.tao(sheets, a, ds, thu_muc, LUU["tafel_qs"] or LUU["tafel"])
         except Exception as e:  # noqa: BLE001 - không để lỗi phần phụ làm mất báo cáo chính
             print(f"  (canh bao) khong tao duoc goi nop bai: {e}")
             nop = False
