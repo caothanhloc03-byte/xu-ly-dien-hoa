@@ -201,11 +201,12 @@ def dinh_dang_chu(gl, a, so_duong=0, chu_thich=True):
                 o.set_int("fsize", int(co))
         except Exception as e:
             print(f"  (canh bao) khong dat duoc co chu {ten}: {e}")
-    if chu_thich and so_duong > 0:
+    if chu_thich and len(so_duong if isinstance(so_duong, (list, tuple)) else range(so_duong)) > 0:
         try:
             lg = gl.label("Legend")
             if lg:
-                lg.text = "\n".join(f"\\l({i}) %({i})" for i in range(1, so_duong + 1))
+                cac_id = list(so_duong) if isinstance(so_duong, (list, tuple)) else range(1, so_duong + 1)
+                lg.text = "\n".join(f"\\l({i}) %({i})" for i in cac_id)
         except Exception as e:
             print(f"  (canh bao) khong dat duoc noi dung chu thich: {e}")
 
@@ -289,7 +290,8 @@ def ve_tafel_chong(muc, a):
         them_duong(gl, wks, 4 * k, 4 * k + 1, m["mau"], a, kieu=201)        # diem
         them_duong(gl, wks, 4 * k + 2, 4 * k + 3, m["mau"], a, kieu=200)    # duong fit
     hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "Log(J)", xl.NHAN_POT,
-                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=len(muc), khoang=khoang_tu_args(a))
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), khoang=khoang_tu_args(a),
+                  so_duong=[2 * k + 1 for k in range(len(muc))])     # chu thich 1 dong / mau (bo dong cua duong fit)
 
 
 
@@ -417,7 +419,7 @@ def ve_tafel_qs(a, duong_dan):
         them_duong(gl, wks, 4 * k, 4 * k + 1, c["mau"], a, kieu=201)        # điểm
         them_duong(gl, wks, 4 * k + 2, 4 * k + 3, c["mau"], a, kieu=200)    # đường fit
     hoan_tat_hinh(gp, gl, a, a.thu_muc_ra, ten, "log |J| (mA cm\u207b\u00b2)", "Potential (V vs RHE)" if ky == "e" else "Overpotential (mV)",
-                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), so_duong=2 * len(cac), khoang=khoang_tu_args(a))
+                  x_max=cuc_dai(*xs), y_max=cuc_dai(*ys), khoang=khoang_tu_args(a), so_duong=[2 * k + 1 for k in range(len(cac))])
 
 
 # ====================== CDL NHIỀU MẪU ======================

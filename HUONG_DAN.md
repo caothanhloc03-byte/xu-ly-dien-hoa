@@ -563,3 +563,10 @@ Công thức: E = a + b·log₁₀|J|, b (mV/dec) = độ dốc × 1000; dùng |
 - **Cửa sổ chính (bố cục giữ nguyên):** dải logo + tên + phiên bản ở đầu; nút **CHẠY XỬ LÝ & VẼ** màu xanh; khung "Báo cáo & Thông số tính toán" nền tối (cảnh báo màu cam, lỗi đỏ, tốt xanh); tiêu đề nhóm và tiêu đề bảng in đậm; tab rộng hơn một chút.
 - **Cửa sổ Cdl nhiều mẫu:** có thêm dải logo ở đầu (mẫu cho các công cụ khác nếu muốn: `giao_dien_dep.dai_logo(cua_so, "Tên công cụ", "mô tả").grid(row=0, ...)`).
 - File mới: `giao_dien_dep.py`. Nếu thiếu file này app vẫn chạy như cũ (không logo phụ/màu mới).
+
+## v100 - Sửa chú thích hình Tafel (Origin)
+
+- **Lỗi:** hình Tafel chồng vẽ bằng Origin có chú thích lặp (mỗi mẫu hiện 2 dòng: điểm và đường fit, cùng một tên) và chỉ đủ chỗ cho 2 mẫu đầu, các mẫu sau không có chú thích.
+- **Sửa:** chú thích giờ chỉ có 1 dòng cho mỗi mẫu, đủ mọi mẫu. Áp dụng cho Tafel cũ (LSV/CV) và Tafel Qs-LSV.
+- **Lưu ý khi chọn khoảng Tafel:** nếu chỉ lấy dòng 9–11 mA/cm² thì log J chỉ trải khoảng 0,09 decade nên độ dốc (mV/dec) rất không ổn định (có thể ra 27 hoặc 146). Nên lấy khoảng rộng hơn, ít nhất khoảng 1 decade.
+- Dấu gạch trên tiêu đề trục/chú thích vẫn chưa xử lý xong: cần bạn thử hai ô "Không chỉnh cỡ chữ tiêu đề/chú thích" và "Không đổi kích thước khung" (tab Hình) rồi báo kết quả.
