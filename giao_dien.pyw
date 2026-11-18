@@ -101,7 +101,7 @@ GOI_Y = {
     "goi_nop_bai": "Kèm báo cáo Excel: Bảng nộp bài, Lặp lại (TB ± SD), Kiểm tra nộp bài, file methods_dien_hoa.txt và goi_tai_lap.zip (dữ liệu thô + kết quả + thông số).",
     "tafel": "Vùng mật độ dòng (mA/cm²) dùng để fit đường Tafel (E theo log|J|) trên đường LSV/CV.\nVới LSV có pic nhỏ, app chỉ lấy nhánh đi lên sau cùng.\n(Tafel từ Qs-LSV: dùng công cụ Qs-LSV.)",
     "tafel_e": "Vùng điện thế (V) dùng để fit Tafel, ví dụ 1.40 đến 1.55. Chọn 'Theo điện thế' ở bên trái. Cần ít nhất 3 điểm trong vùng.",
-    "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel (từ Qs-LSV), ECSA, cảnh báo và thông số đã dùng.",
+    "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel (từ Qs-LSV), ECSA, cảnh báo, thông số đã dùng, VÀ số liệu đã xử lý để vẽ hình (sheet Vẽ CV/LSV/IT/EIS/Tafel, kèm biểu đồ Excel dựng sẵn).",
     "i_muc_tieu": "Các mật độ dòng mục tiêu (mA/cm²) để báo cáo điện thế/quá thế, cách nhau dấu phẩy. Ví dụ: 10, 100.",
     "e_can_bang": "Điện thế cân bằng (V vs RHE) để tính quá thế. OER: 1.23 V; HER: 0 V.",
     "le_max": "Khoảng cách từ dữ liệu lớn nhất đến đầu trục, tính theo số bước chia chính (0.5 = nửa bước).",

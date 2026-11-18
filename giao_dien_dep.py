@@ -29,7 +29,11 @@ def _duong(ten):
 
 def anh_logo(root, kich_thuoc=32):
     """PhotoImage logo vuông kich_thuoc px (None nếu không có). Thu nhỏ bằng PIL nếu có, không thì subsample."""
-    khoa = ("logo", kich_thuoc)
+    try:
+        goc_tk = id(root._root().tk)             # ảnh gắn với 1 phiên Tk; Tk mới (vd khi chạy test) phải nạp lại
+    except Exception:
+        goc_tk = 0
+    khoa = ("logo", kich_thuoc, goc_tk)
     if khoa in _anh:
         return _anh[khoa]
     p = _duong("logo_256.png") or _duong("logo_1024.png")

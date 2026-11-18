@@ -633,6 +633,7 @@ def them_tham_so_chung(ap):
     ap.add_argument("--vai-tro-json", default=None, help="vai tro/nhom tung mau (JSON) cho bang kiem tra nop bai")
     ap.add_argument("--goi-nop-bai", action="store_true", help="kem bao cao: bang nop bai, kiem tra, methods, goi_tai_lap.zip")
     ap.add_argument("--bao-cao", default=None, help="thu muc de xuat bao_cao_tong_hop.xlsx (bo trong = khong xuat)")
+    ap.add_argument("--khong-so-lieu-ve", action="store_true", help="bao cao Excel: KHONG kem cac sheet so lieu da xu ly de ve hinh (Ve CV/LSV/IT/EIS/Tafel) va bieu do dung san")
     ap.add_argument("--i-muc-tieu", default="10", help="cac mat do dong muc tieu (mA/cm2) cho bao cao, cach nhau dau phay")
     ap.add_argument("--e-can-bang", type=float, default=1.23, help="dien the can bang (V) de tinh qua the trong bao cao")
     ap.add_argument("--tafel-qs-json", default=None, help="JSON he so Tafel tu cong cu Qs-LSV (Tafel_QsLSV.json): dien cot Tafel o so sanh/nop bai/bao cao")

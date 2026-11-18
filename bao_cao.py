@@ -158,8 +158,99 @@ def _bang_canh_bao():
         return []
 
 
+# ====================== SỐ LIỆU ĐÃ XỬ LÝ ĐỂ VẼ HÌNH ======================
+# CAU_TRUC[tên sheet] = mô tả sheet "Số liệu vẽ": số cột/mẫu, loại biểu đồ và tên trục (để _ghi_xlsx vẽ sẵn biểu đồ Excel).
+CAU_TRUC = {}
+
+
+def _cot_dai(cot):
+    """dict {tên cột: dãy số} (độ dài khác nhau) -> list[dict hàng] (ô thiếu = None) để ghi sheet dạng cột song song."""
+    n = max((len(v) for v in cot.values()), default=0)
+    hang = []
+    for i in range(n):
+        h = {}
+        for k, v in cot.items():
+            h[k] = _so(v[i]) if i < len(v) else None
+        hang.append(h)
+    return hang
+
+
+def _them_cot(cot, ten, v):
+    k = ten
+    while k in cot:
+        k += "_"
+    cot[k] = list(v)
+
+
+def _so_lieu_ve(a, ds):
+    """Số liệu đã xử lý từ file thô (quy đổi RHE, đổi sang mA/cm², bù iR, chọn chu kỳ, vùng Tafel...) đúng như dùng để vẽ hình:
+    mỗi mẫu 1 cặp cột X-Y cạnh nhau (Tafel: 2 cặp - điểm và đường fit), kèm biểu đồ Excel dựng sẵn."""
+    import xu_ly_dien_hoa as xl
+    CAU_TRUC.clear()
+    muc = []
+    for k, p in enumerate(ds):
+        try:
+            muc.append(xl.nap_muc(p, a, k))
+        except Exception as e:  # noqa: BLE001 - file lỗi đã được báo ở sheet "Lỗi đọc file"
+            print(f"  (luu y) bo qua {os.path.basename(p)} khi xuat so lieu ve: {e}")
+    sheets = []
+    loai_ep = (getattr(a, "loai", None) or "").upper()
+    ck = getattr(a, "chu_ky", None)
+    for loai, ten_sheet, x_ten, y_ten in (("CV", "Vẽ CV", xl.NHAN_E, xl.NHAN_I), ("LSV", "Vẽ LSV", xl.NHAN_E, xl.NHAN_I)):
+        nhom = [m for m in muc if m["loai"] == loai]
+        if not nhom:
+            continue
+        cot = {}
+        for m in nhom:
+            x, y = xl.duong_cv_lsv(m, ck)
+            _them_cot(cot, f"{m['nhan']} | {x_ten}", x)
+            _them_cot(cot, f"{m['nhan']} | {y_ten}", y)
+        sheets.append((ten_sheet, _cot_dai(cot)))
+        CAU_TRUC[ten_sheet] = {"cot": 2, "kieu": "duong", "x": x_ten, "y": y_ten, "mau": [m["mau"] for m in nhom]}
+    nhom = [m for m in muc if m["loai"] == "IT"]
+    if nhom:
+        cot = {}
+        for m, t, i in xl.duong_it(nhom, getattr(a, "noi_tiep", False)):
+            _them_cot(cot, f"{m['nhan']} | T (h)", t)
+            _them_cot(cot, f"{m['nhan']} | {xl.NHAN_I}", i)
+        sheets.append(("Vẽ IT", _cot_dai(cot)))
+        CAU_TRUC["Vẽ IT"] = {"cot": 2, "kieu": "duong", "x": "T (h)", "y": xl.NHAN_I, "mau": [m["mau"] for m in nhom]}
+    nhom = [m for m in muc if m["loai"] == "EIS"]
+    if nhom:
+        cot = {}
+        for m in nhom:
+            for c in ("Z' (ohm)", "-Z'' (ohm)", "f (Hz)", "|Z| (ohm)", "pha (do)"):
+                _them_cot(cot, f"{m['nhan']} | {c}", m["d"][c].to_numpy())
+        sheets.append(("Vẽ EIS", _cot_dai(cot)))
+        CAU_TRUC["Vẽ EIS"] = {"cot": 5, "kieu": "duong", "x": "Z' (Ω)", "y": "-Z'' (Ω)", "mau": [m["mau"] for m in nhom]}
+    if loai_ep == "TAFEL":
+        cot, mau = {}, []
+        for m in muc:
+            if m["loai"] not in ("CV", "LSV", "TAFEL"):
+                continue
+            try:
+                df_t, slope, a_s, b_i = xl.tafel_a(m["d"], a)
+            except Exception as e:  # noqa: BLE001
+                print(f"  (luu y) khong tinh duoc Tafel cho {m['nhan']} khi xuat so lieu ve: {e}")
+                continue
+            lj = df_t["Log(J)"].to_numpy()
+            xf = [float(lj.min()), float(lj.max())]
+            nh = f"{m['nhan']} ({slope:.1f} mV/dec)"
+            _them_cot(cot, f"{nh} | Log(J)", lj)
+            _them_cot(cot, f"{nh} | {xl.NHAN_POT}", df_t["Potential (V vs RHE)"].to_numpy())
+            _them_cot(cot, f"{nh} | Log(J) fit", xf)
+            _them_cot(cot, f"{nh} | E fit = a*logJ + b", [a_s * x + b_i for x in xf])
+            mau.append(m["mau"])
+        if cot:
+            sheets.append(("Vẽ Tafel", _cot_dai(cot)))
+            CAU_TRUC["Vẽ Tafel"] = {"cot": 4, "kieu": "tafel", "x": "Log(J)", "y": xl.NHAN_POT, "mau": mau}
+    return sheets
+
+
+
 def tao_noi_dung(a, ds):
     """Trả về list[(ten_sheet, [dict hàng])] hoặc (ten, [(khóa, giá trị)]) cho 'Thông tin'."""
+    CAU_TRUC.clear()
     import cong_cu
     loai_ep = (getattr(a, "loai", None) or "").upper() or None
     i_muc_tieu = []
@@ -216,6 +307,11 @@ def tao_noi_dung(a, ds):
             sheets.append(("Tafel (Qs-LSV)", _bang_tafel_qs()))
         if nhom.get("loi"):
             sheets.append(("Lỗi đọc file", nhom["loi"]))
+        if not getattr(a, "khong_so_lieu_ve", False):
+            try:
+                sheets.extend(_so_lieu_ve(a, ds))          # số liệu đã xử lý để vẽ hình (kèm biểu đồ Excel dựng sẵn)
+            except Exception as e:  # noqa: BLE001 - lỗi phần phụ không được làm mất báo cáo chính
+                print(f"  (canh bao) khong xuat duoc so lieu ve hinh: {e}")
     for khoa, ten_sheet in (("so_sanh", "So sánh mẫu"), ("so_sanh_nhom", "Nhóm (TB ± SD)"), ("so_sanh_tai_lieu", "So sánh tài liệu"),
                             ("fe", "Hiệu suất Faraday"), ("fit_eis", "Fit EIS"), ("tof_cv", "TOF từ CV")):
         if LUU.get(khoa):
@@ -261,7 +357,64 @@ def _ghi_xlsx(duong, sheets):
                 for c in r:
                     c.fill = PatternFill("solid", fgColor=mau[r[0].value])
         ws.freeze_panes = "A2"
+        if ten in CAU_TRUC and hang:
+            try:
+                _ve_bieu_do(ws, CAU_TRUC[ten], len(hang), len(cot), ten)
+            except Exception as e:  # noqa: BLE001
+                print(f"  (canh bao) khong dung duoc bieu do Excel cho sheet {ten}: {e}")
     wb.save(duong)
+
+
+def _hex(m):
+    try:
+        from matplotlib.colors import to_hex
+        return to_hex(m).lstrip("#").upper()
+    except Exception:
+        return None
+
+
+def _ve_bieu_do(ws, cs, n_hang, n_cot, ten):
+    """Biểu đồ phân tán (scatter) dựng sẵn từ các cặp cột X-Y của sheet 'Vẽ ...', đặt bên phải bảng số liệu."""
+    from openpyxl.chart import Reference, ScatterChart, Series
+    from openpyxl.chart.layout import Layout, ManualLayout  # noqa: F401
+    g = cs["cot"]
+    ch = ScatterChart()
+    ch.style = 2
+    ch.scatterStyle = "lineMarker"
+    ch.height, ch.width = 11, 18
+    ch.x_axis.title, ch.y_axis.title = cs["x"], cs["y"]
+    ch.x_axis.delete = False
+    ch.y_axis.delete = False
+    ch.legend.position = "b"
+    n_mau = n_cot // g
+    for i in range(n_mau):
+        c0 = i * g + 1
+        mau = _hex(cs["mau"][i]) if i < len(cs["mau"]) else None
+        cap = [(c0, c0 + 1, cs["kieu"] == "tafel")]
+        if cs["kieu"] == "tafel":
+            cap.append((c0 + 2, c0 + 3, False))
+        for kx, ky, diem in cap:
+            x = Reference(ws, min_col=kx, min_row=2, max_row=n_hang + 1)
+            y = Reference(ws, min_col=ky, min_row=1, max_row=n_hang + 1)
+            sr = Series(y, x, title_from_data=True)
+            if diem:                                  # Tafel: điểm dữ liệu = chấm tròn, không nối
+                sr.marker.symbol = "circle"
+                sr.marker.size = 5
+                sr.graphicalProperties.line.noFill = True
+                if mau:
+                    sr.marker.graphicalProperties.solidFill = mau
+                    sr.marker.graphicalProperties.line.solidFill = mau
+            else:
+                sr.marker.symbol = "none"
+                sr.smooth = False
+                if mau:
+                    sr.graphicalProperties.line.solidFill = mau
+                sr.graphicalProperties.line.width = 19050
+                if cs["kieu"] == "tafel":
+                    sr.graphicalProperties.line.dashStyle = "dash"
+            ch.series.append(sr)
+    from openpyxl.utils import get_column_letter
+    ws.add_chart(ch, f"{get_column_letter(n_cot + 2)}2")
 
 
 def _ghi_csv(duong, sheets):

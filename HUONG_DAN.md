@@ -570,3 +570,19 @@ Công thức: E = a + b·log₁₀|J|, b (mV/dec) = độ dốc × 1000; dùng |
 - **Sửa:** chú thích giờ chỉ có 1 dòng cho mỗi mẫu, đủ mọi mẫu. Áp dụng cho Tafel cũ (LSV/CV) và Tafel Qs-LSV.
 - **Lưu ý khi chọn khoảng Tafel:** nếu chỉ lấy dòng 9–11 mA/cm² thì log J chỉ trải khoảng 0,09 decade nên độ dốc (mV/dec) rất không ổn định (có thể ra 27 hoặc 146). Nên lấy khoảng rộng hơn, ít nhất khoảng 1 decade.
 - Dấu gạch trên tiêu đề trục/chú thích vẫn chưa xử lý xong: cần bạn thử hai ô "Không chỉnh cỡ chữ tiêu đề/chú thích" và "Không đổi kích thước khung" (tab Hình) rồi báo kết quả.
+
+## v101 - Báo cáo Excel kèm số liệu đã xử lý để vẽ hình
+
+Khi tick **Xuất báo cáo Excel**, file `bao_cao_tong_hop.xlsx` ngoài các bảng tổng hợp (Epa/Ipa, quá thế, Tafel, ECSA, cảnh báo, thông số) nay có thêm các sheet **số liệu vẽ hình**:
+
+| Sheet | Nội dung (mỗi mẫu một cụm cột cạnh nhau) |
+|---|---|
+| Vẽ CV / Vẽ LSV | E (V vs RHE) và I (mA/cm²) đã quy đổi RHE, mA/cm², bù iR, đúng chu kỳ CV đã chọn |
+| Vẽ IT | T (h) và I (mA/cm²), đã loại đoạn nhiễu, có tùy chọn nối tiếp thời gian |
+| Vẽ EIS | Z', -Z'', f, \|Z\|, pha (đủ để vẽ Nyquist và Bode) |
+| Vẽ Tafel | Log(J), E của các điểm dùng để fit + 2 điểm của đường fit (E = a·logJ + b); tên mẫu kèm hệ số Tafel |
+
+- Mỗi sheet có sẵn **biểu đồ Excel** (scatter) đặt bên phải bảng, cùng màu mẫu như trong app; có thể copy/sửa trong Excel hoặc dán số liệu vào Origin để vẽ lại.
+- ECSA: các điểm đã có ở sheet "ECSA - điểm"; Cdl nhiều mẫu có file riêng `Cdl_nhieu_diem.csv`.
+- Chưa có số liệu điểm cho Tafel của công cụ Qs-LSV trong báo cáo (công cụ đó tự ghi CSV/JSON riêng).
+- Không muốn các sheet này: thêm tham số dòng lệnh `--khong-so-lieu-ve`.
