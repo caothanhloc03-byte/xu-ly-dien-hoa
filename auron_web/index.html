@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AURON · Trợ lý Echem Studio</title>
+<style>
+  :root{ --c:#3DE0FF; --bg:#05080D; --panel:rgba(9,14,22,.82); --line:#1F2B3B; --text:#E8EEF4; --muted:#93A3B6; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:'Be Vietnam Pro',system-ui,sans-serif;overflow:hidden}
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+  #gl:active{cursor:grabbing}
+  .brain{display:flex;flex-direction:column;gap:8px;width:100%}
+  .bar{height:6px;border-radius:3px;background:#1A2433;overflow:hidden;display:none}
+  .bar i{display:block;height:100%;width:0;background:var(--c);transition:width .3s}
+  #bstat{font-size:13px;color:var(--muted);line-height:1.5}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .label{font-family:'Chakra Petch',sans-serif;font-size:12px;letter-spacing:2px;color:var(--muted);margin-right:6px}
+  button{font-family:inherit;font-size:14px;color:var(--text);background:#111A27;border:1px solid #263347;border-radius:12px;min-height:44px;padding:0 12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:8px;transition:border-color .2s,background .2s}
+  button:hover{border-color:#3A4D66;background:#152132}
+  button:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+  button[aria-pressed="true"]{border-color:var(--c);background:#0F2A33}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  select{font-family:inherit;font-size:14px;color:var(--text);background:#0B121C;border:1px solid #263347;border-radius:12px;min-height:44px;padding:0 12px}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;box-shadow:0 0 10px currentColor}
+  select,input[type=text]{font-family:inherit;font-size:14px;color:var(--text);background:#0B121C;border:1px solid #263347;border-radius:12px;min-height:44px;padding:0 12px}
+  input[type=text]{flex:1;min-width:180px}
+  select:focus-visible,input:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+  .rng{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .rng input{accent-color:var(--c);width:110px}
+  #vnote{font-size:13px;color:#FFC857;line-height:1.5;display:none;width:100%}
+  #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--muted)}
+
+  .brand{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:20px;letter-spacing:4px;color:var(--c);transition:color .4s}
+  .sub{font-size:12px;color:var(--muted);line-height:1.4}
+  /* khung trả lời: rộng, cao, bên phải */
+  #chat{position:fixed;right:16px;top:16px;bottom:16px;width:min(640px,48vw);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(8px)}
+  #chatTop{display:flex;align-items:baseline;gap:12px}
+  #log{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;scroll-behavior:smooth}
+  .msg,#say{font-size:15px;line-height:1.65;white-space:pre-wrap;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.045);word-wrap:break-word}
+  #say:empty{display:none}
+  .msg.you{align-self:flex-end;background:#0F2A33;color:#CFEFF6;max-width:86%;font-size:14px}
+  .msg.dg{border:1px solid var(--c);background:rgba(61,224,255,.07)}
+  .msg .tt{font-weight:600;color:var(--c);margin-bottom:4px;font-size:13px;letter-spacing:.5px}
+  #sayForm{display:flex;gap:8px;align-items:center}
+  #goiY{gap:6px}
+  #goiY button{min-height:32px;font-size:13px;padding:0 10px;border-radius:16px}
+  /* bảng điều khiển nhỏ, bên trái, kéo được và thu gọn được */
+  #ctl{position:fixed;left:12px;top:14px;width:246px;max-height:calc(100vh - 28px);background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;backdrop-filter:blur(8px);transition:transform .28s ease;z-index:5}
+  #ctl.min{transform:translateX(calc(-100% + 44px))}
+  #ctlHead{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;cursor:grab;user-select:none;touch-action:none;border-bottom:1px solid var(--line)}
+  #ctlHead:active{cursor:grabbing}
+  #ctlMin{min-height:30px;width:30px;padding:0;justify-content:center;border-radius:9px}
+  #ctlBody{padding:10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+  #ctlBody button,#ctlBody select{min-height:34px;font-size:13px;border-radius:10px;width:100%}
+  #ctlBody .r2{display:flex;gap:6px}
+  #ctlBody .r2 button{padding:0 6px;justify-content:center}
+  #ctlBody .rng{justify-content:space-between}
+  #ctlBody .rng input{width:120px}
+  #ctlBody hr{border:0;border-top:1px solid var(--line);margin:2px 0;width:100%}
+  @media (max-width:760px){ #chat{width:calc(100vw - 32px);top:auto;height:48vh} #ctl{width:210px} }
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="Mô hình 3D trợ lý hologram AURON, kéo để xoay" role="img"></canvas>
+<aside id="ctl" aria-label="Bảng điều khiển">
+  <div id="ctlHead"><button id="ctlMin" type="button" aria-label="Thu gọn hoặc mở rộng bảng điều khiển" title="Thu gọn / mở rộng (kéo thanh này để di chuyển)">◂</button><span class="label" style="margin:0">ĐIỀU KHIỂN</span></div>
+  <div id="ctlBody">
+    <div class="r2"><button id="tVoice" aria-pressed="true">Đọc to</button><button id="tFx" aria-pressed="true">Hiệu ứng</button></div>
+    <label for="vSel" class="sr">Giọng</label><select id="vSel" aria-label="Chọn giọng đọc"></select>
+    <select id="vMode" aria-label="Kiểu đọc">
+      <option value="robot" selected>Kiểu đọc: máy móc</option>
+      <option value="system">Kiểu đọc: hệ thống</option>
+      <option value="natural">Kiểu đọc: tự nhiên</option>
+    </select>
+    <label class="rng">Cao độ <input id="vPitch" type="range" min="0.1" max="1.6" step="0.05" value="0.35"></label>
+    <label class="rng">Tốc độ <input id="vRate" type="range" min="0.6" max="1.4" step="0.05" value="1.0"></label>
+    <div id="vnote"></div>
+    <div class="r2"><button id="tLook" aria-pressed="true">Mắt theo chuột</button><button id="tReset" type="button">Chính diện</button></div>
+    <hr>
+    <span class="label" style="margin:0">BỘ NÃO</span>
+    <label for="mSel" class="sr">Chọn mô hình</label>
+    <select id="mSel">
+      <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 0.5B · nhẹ (~0,4 GB)</option>
+      <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC" selected>Qwen 1.5B · cân bằng (~1 GB)</option>
+      <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen 3B · thông minh (~2 GB)</option>
+    </select>
+    <button id="bLoad" type="button">Kích hoạt bộ não</button>
+    <div class="brain"><div class="bar" id="bbar"><i></i></div><div id="bstat">Chưa kích hoạt. AURON vẫn tra cứu được hướng dẫn và đánh giá dữ liệu của Echem Studio. Kích hoạt để trò chuyện tự do (tải một lần, sau đó chạy offline).</div></div>
+  </div>
+</aside>
+<section id="chat" aria-label="Khung trả lời" aria-live="polite">
+  <div id="chatTop"><div class="brand">AURON</div><div class="sub">Trợ lý hỏi đáp &amp; đánh giá dữ liệu của Echem Studio</div><span id="mood" hidden></span><span id="code" hidden></span></div>
+  <div id="log"><div id="hist"></div><div id="say"></div></div>
+  <div class="row" id="goiY"></div>
+  <form id="sayForm">
+    <label for="sayIn" class="sr">Nói với AURON</label>
+    <input id="sayIn" type="text" placeholder="Hỏi AURON về cách làm, công thức, kết quả…" autocomplete="off">
+    <button type="submit" id="bSend">Gửi</button>
+  </form>
+  <div id="you" hidden></div>
+</section>
+<div id="err">Trình duyệt chưa hỗ trợ WebGL nên không hiển thị được mô hình 3D.</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="tro_giup.js"></script>
+<script>
+(function(){
+'use strict';
+if (!window.THREE) { document.getElementById('err').style.display='flex'; return; }
+
+/* ---------------- Biểu cảm ---------------- */
+function sym(o){ return [Object.assign({},o), Object.assign({},o)]; }
+var BASE = {
+  eyes: sym({s:'oval', w:118, h:150, lid:0, tilt:0, dx:0, dy:0}),
+  brows: sym({y:0, t:0}), browA: .85,
+  mouth: {s:'curve', w:170, c:.2, o:0, sl:0, dy:0},
+  blush:0, ring:1, part:1, tiltZ:0, nod:0, bob:1, scan:0, zzz:0
+};
+function E(id, name, color, line, over){
+  var x = JSON.parse(JSON.stringify(BASE));
+  over = over || {};
+  if (over.eyes) x.eyes = over.eyes.map(function(e,i){ return Object.assign({}, x.eyes[i], e); });
+  if (over.brows) x.brows = over.brows.map(function(b,i){ return Object.assign({}, x.brows[i], b); });
+  if (over.mouth) x.mouth = Object.assign({}, x.mouth, over.mouth);
+  ['browA','blush','ring','part','tiltZ','nod','bob','scan','zzz'].forEach(function(k){ if (over[k] !== undefined) x[k] = over[k]; });
+  x.id=id; x.name=name; x.color=color; x.line=line; return x;
+}
+var EXPR = [
+  E('neutral','Bình thường','#3DE0FF','Hệ thống ổn định. Tôi đang lắng nghe, thưa ngài.'),
+  E('listen','Lắng nghe','#62E6FF','Vâng, tôi nghe rõ. Ngài cứ nói tiếp.',
+    {eyes:sym({w:126,h:160}), brows:sym({y:-14,t:-.05}), mouth:{w:90,c:.1}, ring:.7, part:.8}),
+  E('happy','Vui vẻ','#5CF2C4','Tuyệt vời! Mọi việc đã hoàn tất.',
+    {eyes:sym({s:'arcUp',w:132,h:120}), brows:sym({y:-12}), mouth:{c:.9,w:190}, bob:1.4}),
+  E('laugh','Cười lớn','#7CF5A0','Ha ha, câu đùa hay đấy thưa ngài!',
+    {eyes:sym({s:'arcUp',w:142,h:110,dy:-6}), brows:sym({y:-26}), mouth:{c:1,o:.9,w:220}, bob:2.4, ring:1.6, tiltZ:.05}),
+  E('excited','Hào hứng','#FFE066','Dự án mới ư? Bắt đầu ngay thôi!',
+    {eyes:sym({s:'star',w:162,h:162}), brows:sym({y:-30}), mouth:{c:1,o:.6,w:200}, ring:2.2, part:2.5, bob:1.8}),
+  E('love','Yêu thích','#FF7EB6','Tôi rất thích được làm việc cùng ngài.',
+    {eyes:sym({s:'heart',w:150,h:150}), mouth:{c:.8,w:160}, blush:1, bob:1.4}),
+  E('proud','Tự tin','#FFD166','Việc này dễ thôi, cứ để tôi lo.',
+    {eyes:sym({w:126,h:140,lid:.42,tilt:-.15}), brows:sym({y:-6,t:-.1}), mouth:{c:.55,w:150,sl:-16}, nod:-.14}),
+  E('wink','Nháy mắt','#3DE0FF','Bí mật của ngài an toàn với tôi.',
+    {eyes:[{s:'arcUp',w:130,h:110},{}], brows:[{y:8,t:.1},{y:-16}], mouth:{c:.7,w:170,sl:-14}, tiltZ:.08}),
+  E('surprised','Ngạc nhiên','#FFC857','Ồ! Điều này nằm ngoài dự đoán của tôi.',
+    {eyes:sym({w:150,h:184}), brows:sym({y:-50}), mouth:{s:'o',w:70,o:1}, nod:-.1, part:1.8}),
+  E('thinking','Suy nghĩ','#A98BFF','Để tôi phân tích dữ liệu một chút…',
+    {eyes:sym({w:110,h:140,dx:32,dy:-28,lid:.2}), brows:[{y:6,t:.15},{y:-30,t:-.1}], mouth:{w:90,c:-.1,sl:-18,dy:6}, ring:1.8, tiltZ:.09}),
+  E('focused','Phân tích','#00F0FF','Đang quét hệ thống… không phát hiện mối đe doạ.',
+    {eyes:sym({w:124,h:150,lid:.48,tilt:.22}), brows:sym({y:14,t:.2}), mouth:{w:110,c:0}, ring:3, part:1.5, scan:1}),
+  E('skeptical','Nghi ngờ','#C3B1FF','Ngài chắc chắn muốn xoá thư mục đó chứ?',
+    {eyes:[{},{lid:.5,tilt:.3}], brows:[{y:-32,t:-.2},{y:18,t:.35}], mouth:{w:140,c:0,sl:22}, tiltZ:-.07}),
+  E('confused','Bối rối','#FFA45C','Lệnh này hơi khó hiểu… ngài nói lại được không?',
+    {eyes:sym({s:'spiral',w:140,h:140}), brows:[{y:-22,t:-.3},{y:10,t:.3}], mouth:{s:'zig',w:150}, tiltZ:.11}),
+  E('sad','Buồn','#6E8BFF','Rất tiếc… tệp đó không khôi phục được nữa.',
+    {eyes:sym({w:106,h:122,dy:18,lid:.3,tilt:-.9}), brows:sym({y:-6,t:-.45}), mouth:{c:-.7,w:130,dy:10}, nod:.2, ring:.5, part:.4, bob:.5}),
+  E('angry','Tức giận','#FF4D4D','Phát hiện truy cập trái phép. Đang chặn lại!',
+    {eyes:sym({w:122,h:132,lid:.36,tilt:1}), brows:sym({y:24,t:.5}), mouth:{c:-.5,w:150,o:.15}, ring:2.6, part:3, nod:-.05}),
+  E('sleepy','Buồn ngủ','#6A7BB0','Đang chuyển sang chế độ tiết kiệm năng lượng… zzz.',
+    {eyes:sym({h:140,dy:6,lid:.74,tilt:-.2}), brows:sym({y:6}), browA:.45, mouth:{w:70,c:.05,o:.1}, ring:.3, part:.25, bob:.4, nod:.13, zzz:1})
+];
+
+/* ---------------- Three.js scene ---------------- */
+var canvas = document.getElementById('gl');
+var renderer;
+try { renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true}); }
+catch(e){ document.getElementById('err').style.display='flex'; return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.setClearColor(0x05080D, 1);
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
+var camDist = 8;
+
+var color = new THREE.Color('#3DE0FF');
+var targetColor = new THREE.Color('#3DE0FF');
+
+var root = new THREE.Group(); scene.add(root);
+var head = new THREE.Group(); root.add(head);
+var headScale = new THREE.Group(); headScale.scale.set(1,1,1); head.add(headScale);
+
+function holoMat(base, rim){
+  return new THREE.ShaderMaterial({
+    uniforms:{ uColor:{value:color}, uTime:{value:0}, uBase:{value:base}, uRim:{value:rim} },
+    vertexShader:'varying vec3 vN; varying vec3 vV; varying float vY; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = -mv.xyz; vY = (modelMatrix*vec4(position,1.0)).y; gl_Position = projectionMatrix*mv; }',
+    fragmentShader:'uniform vec3 uColor; uniform float uTime; uniform float uBase; uniform float uRim; varying vec3 vN; varying vec3 vV; varying float vY; void main(){ float f = 1.0-abs(dot(normalize(vN),normalize(vV))); f = pow(f,2.2); float scan = 0.5+0.5*sin(vY*46.0-uTime*3.0); float band = smoothstep(0.96,1.0,sin(vY*3.0-uTime*1.4)); float a = uBase + f*uRim + scan*0.035 + band*0.12; gl_FragColor = vec4(uColor*(0.6+f*0.9), a); }',
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide
+  });
+}
+var mats = [];
+function track(m){ mats.push(m); return m; }
+
+// Vỏ đầu
+var shell = new THREE.Mesh(new THREE.SphereGeometry(1,64,48), track(holoMat(.03,.85)));
+headScale.add(shell);
+var wire = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.015,3)),
+  new THREE.LineBasicMaterial({color:color, transparent:true, opacity:.10, blending:THREE.AdditiveBlending, depthWrite:false}));
+headScale.add(wire);
+// Lõi thần kinh
+var core = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(.42,1)),
+  new THREE.LineBasicMaterial({color:color, transparent:true, opacity:.05, blending:THREE.AdditiveBlending, depthWrite:false}));
+core.position.set(0,.15,-.62); core.scale.setScalar(.6); head.add(core);
+var coreDot = new THREE.Mesh(new THREE.SphereGeometry(.09,24,16), new THREE.MeshBasicMaterial({color:color, transparent:true, opacity:.15, blending:THREE.AdditiveBlending, depthWrite:false}));
+core.add(coreDot);
+
+// Màn hình khuôn mặt (vẽ bằng canvas 2D)
+var FW=1024, FH=832;
+var faceCanvas = document.createElement('canvas'); faceCanvas.width=FW; faceCanvas.height=FH;
+var fx = faceCanvas.getContext('2d');
+var faceTex = new THREE.CanvasTexture(faceCanvas);
+var PHI_L = 2.4, TH_S = .62, TH_L = 1.75;
+var face = new THREE.Mesh(new THREE.SphereGeometry(1.006,64,48, Math.PI/2-PHI_L/2, PHI_L, TH_S, TH_L),
+  new THREE.MeshBasicMaterial({map:faceTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.FrontSide}));
+headScale.add(face);
+
+// Tai
+var ears = [];
+var glowMat = new THREE.MeshBasicMaterial({color:color, transparent:true, opacity:.85, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
+[-1,1].forEach(function(s){
+  var g = new THREE.Group(); g.position.set(s*1.0,.02,0); g.rotation.y = s*Math.PI/2;
+  g.add(new THREE.Mesh(new THREE.TorusGeometry(.2,.012,8,48), glowMat));
+  var inner = new THREE.Mesh(new THREE.RingGeometry(.09,.13,32,1,0,Math.PI*1.4), glowMat);
+  g.add(inner); g.userData.inner = inner;
+  g.add(new THREE.Mesh(new THREE.CircleGeometry(.045,24), glowMat));
+  head.add(g); ears.push(g);
+});
+// Ăng-ten / mào
+var crest = new THREE.Mesh(new THREE.ConeGeometry(.05,.34,4), glowMat);
+crest.position.set(0,1.13,0); head.add(crest);
+
+// Vòng HUD
+var rings = new THREE.Group(); root.add(rings);
+function ringLine(r, op){ return new THREE.Mesh(new THREE.TorusGeometry(r,.006,6,160), new THREE.MeshBasicMaterial({color:color, transparent:true, opacity:op, blending:THREE.AdditiveBlending, depthWrite:false})); }
+var r1 = ringLine(1.6,.55); r1.rotation.x = Math.PI/2.2; rings.add(r1);
+var r2 = ringLine(1.82,.3); r2.rotation.x = Math.PI/1.75; r2.rotation.y = .4; rings.add(r2);
+var arc = new THREE.Mesh(new THREE.RingGeometry(1.42,1.47,96,1,0,Math.PI*1.25), glowMat);
+arc.rotation.x = -Math.PI/2; rings.add(arc);
+var arc2 = new THREE.Mesh(new THREE.RingGeometry(1.5,1.52,96,1,Math.PI*1.4,Math.PI*.45), glowMat);
+arc2.rotation.x = -Math.PI/2; rings.add(arc2);
+var ticks = new THREE.Group(); rings.add(ticks);
+var tickGeo = new THREE.BoxGeometry(.012,.012,.09);
+for (var i=0;i<90;i++){ var a=i/90*Math.PI*2; var m=new THREE.Mesh(tickGeo, glowMat); var rr = 2.05; m.position.set(Math.cos(a)*rr,0,Math.sin(a)*rr); m.lookAt(0,0,0); if(i%5===0) m.scale.z = 2.2; ticks.add(m); }
+ticks.rotation.x = .18;
+
+// Hạt sáng
+var N = 1800, pos = new Float32Array(N*3);
+for (var j=0;j<N;j++){ var u=Math.random()*2-1, th=Math.random()*Math.PI*2, rad=1.35+Math.pow(Math.random(),1.6)*1.4, q=Math.sqrt(1-u*u); pos[j*3]=q*Math.cos(th)*rad; pos[j*3+1]=u*rad*.9; pos[j*3+2]=q*Math.sin(th)*rad; }
+var pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos,3));
+var pmat = new THREE.PointsMaterial({color:color, size:.022, transparent:true, opacity:.75, blending:THREE.AdditiveBlending, depthWrite:false});
+var points = new THREE.Points(pg, pmat); root.add(points);
+
+// Bệ chiếu
+var base = new THREE.Group(); base.position.y = -2.55; scene.add(base);
+base.add(new THREE.Mesh(new THREE.CylinderGeometry(.75,.85,.14,64), new THREE.MeshBasicMaterial({color:0x0C1420})));
+var baseRing = new THREE.Mesh(new THREE.TorusGeometry(.76,.014,8,96), glowMat); baseRing.rotation.x = Math.PI/2; baseRing.position.y = .075; base.add(baseRing);
+var beam = new THREE.Mesh(new THREE.CylinderGeometry(1.3,.7,1.0,64,1,true), new THREE.ShaderMaterial({
+  uniforms:{uColor:{value:color}, uTime:{value:0}},
+  vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader:'uniform vec3 uColor; uniform float uTime; varying vec2 vUv; void main(){ float a = (1.0-vUv.y)*0.22*(0.8+0.2*sin(vUv.x*60.0+uTime*2.0)); gl_FragColor = vec4(uColor, a*vUv.y*2.5); }',
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide}));
+beam.position.y = .55; base.add(beam); mats.push(beam.material);
+var grid = new THREE.PolarGridHelper(3.2, 16, 8, 64, color, color);
+grid.material.transparent = true; grid.material.opacity = .14; grid.material.blending = THREE.AdditiveBlending; grid.material.depthWrite=false;
+grid.material.vertexColors = false; grid.material.color = new THREE.Color(); grid.position.y = -.07; base.add(grid);
+var basicMats = [glowMat, r1.material, r2.material, wire.material, core.material, coreDot.material, pmat, grid.material];
+
+/* ---------------- Giọng nói hệ thống ---------------- */
+var synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+var voiceOn = true, voice = null, voicePitch = .35, voiceRate = 1.0, voiceMode = 'robot', fxOn = true, pending = 0, speakId = 0, speaking = false, wordPulse = 0, voiceList = [];
+var vSel = document.getElementById('vSel'), vNote = document.getElementById('vnote');
+function note(msg){ vNote.textContent = msg; vNote.style.display = msg ? 'block' : 'none'; }
+function loadVoices(){
+  if (!synth){ note('Trình duyệt này không hỗ trợ đọc giọng nói. Hãy thử Chrome hoặc Microsoft Edge.'); vSel.disabled = true; return; }
+  var all = synth.getVoices(); if (!all.length) return;
+  var vi = all.filter(function(v){ return /^vi/i.test(v.lang); });
+  var rest = all.filter(function(v){ return !/^vi/i.test(v.lang); });
+  vi.sort(function(a,b){ return (/natural|online|neural/i.test(b.name)?1:0) - (/natural|online|neural/i.test(a.name)?1:0); });
+  voiceList = vi.concat(rest);
+  var prev = voice && voice.name;
+  vSel.innerHTML = '';
+  voiceList.forEach(function(v,i){ var o = document.createElement('option'); o.value = i; o.textContent = v.name + ' (' + v.lang + ')'; vSel.appendChild(o); });
+  var idx = prev ? voiceList.findIndex(function(v){ return v.name === prev; }) : 0;
+  vSel.value = Math.max(0, idx); voice = voiceList[Math.max(0, idx)] || null;
+  if (!vi.length) note('Máy bạn chưa có giọng tiếng Việt nên câu sẽ bị đọc sai. Cách thêm: mở trang này bằng Microsoft Edge (có sẵn giọng HoaiMy, NamMinh), hoặc trên Windows vào Settings › Time & language › Speech để cài giọng Tiếng Việt, trên Mac vào System Settings › Accessibility › Spoken Content.');
+  else note('');
+}
+if (synth){ loadVoices(); if ('onvoiceschanged' in synth) synth.onvoiceschanged = loadVoices; setTimeout(loadVoices, 600); }
+else loadVoices();
+setTimeout(function(){ if (synth && !voiceList.length) note('Chưa tìm thấy giọng đọc nào trên máy này. Hãy mở trang bằng Chrome hoặc Microsoft Edge trên máy tính.'); }, 2000);
+vSel.addEventListener('change', function(){ voice = voiceList[+vSel.value] || null; speak('Đã chuyển giọng. Tôi nghe thế này ổn chứ, thưa ngài?'); });
+document.getElementById('vPitch').addEventListener('input', function(e){ voicePitch = +e.target.value; });
+document.getElementById('vRate').addEventListener('input', function(e){ voiceRate = +e.target.value; });
+document.getElementById('vMode').addEventListener('change', function(e){ voiceMode = e.target.value; speak(voiceMode === 'robot' ? 'Chế độ máy móc đã kích hoạt.' : voiceMode === 'system' ? 'Chế độ hệ thống đã kích hoạt.' : 'Tôi sẽ nói tự nhiên hơn, thưa ngài.'); });
+/* Âm thanh máy: tiếng bíp mở/đóng và lớp rè điện tử khi đang nói */
+var actx = null, hum = null;
+function audio(){ if (!actx){ try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ actx = null; } } if (actx && actx.state === 'suspended') actx.resume(); return actx; }
+function beep(f1, f2, when){
+  var c = audio(); if (!c) return; var t0 = c.currentTime + (when||0);
+  [[f1,0],[f2,.09]].forEach(function(p){
+    var o = c.createOscillator(), g = c.createGain(); o.type = 'square'; o.frequency.value = p[0];
+    g.gain.setValueAtTime(0, t0+p[1]); g.gain.linearRampToValueAtTime(.05, t0+p[1]+.01); g.gain.exponentialRampToValueAtTime(.0001, t0+p[1]+.08);
+    o.connect(g).connect(c.destination); o.start(t0+p[1]); o.stop(t0+p[1]+.1);
+  });
+}
+function humOn(){
+  var c = audio(); if (!c || hum) return;
+  var o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+  o.type = 'sawtooth'; o.frequency.value = 82; f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 3;
+  g.gain.value = 0; lfo.type = 'square'; lfo.frequency.value = 28; lg.gain.value = .012;
+  lfo.connect(lg).connect(g.gain); o.connect(f).connect(g).connect(c.destination);
+  g.gain.setValueAtTime(0, c.currentTime); g.gain.linearRampToValueAtTime(.014, c.currentTime + .05);
+  o.start(); lfo.start(); hum = {o:o, lfo:lfo, g:g};
+}
+function humOff(){
+  if (!hum || !actx) return; var h = hum; hum = null; var t = actx.currentTime;
+  h.g.gain.cancelScheduledValues(t); h.g.gain.setValueAtTime(h.g.gain.value, t); h.g.gain.linearRampToValueAtTime(0, t + .08);
+  h.o.stop(t + .1); h.lfo.stop(t + .1);
+}
+function chunks(txt){
+  if (voiceMode !== 'robot') return [txt];
+  // Tách từng tiếng (âm tiết) để đọc rời rạc, đều nhịp như máy
+  return txt.replace(/([,.;:!?…])/g, ' $1 ').split(/\s+/).filter(Boolean).reduce(function(acc, w){
+    if (/^[,.;:!?…]$/.test(w)) { if (acc.length) acc[acc.length-1] += w; } else acc.push(w); return acc; }, []);
+}
+function speak(txt){
+  if (!synth || !voiceOn) return false;
+  try {
+    synth.cancel(); humOff();
+    var id = ++speakId, parts = chunks(txt), mode = voiceMode;
+    var pitch = mode === 'natural' ? 1 : voicePitch, rate = mode === 'natural' ? 1 : voiceRate;
+    if (mode === 'robot') rate = Math.min(2, rate * 1.15);
+    pending = parts.length;
+    if (fxOn && mode !== 'natural') beep(1320, 880);
+    parts.forEach(function(p, i){
+      var u = new SpeechSynthesisUtterance(p);
+      if (voice){ u.voice = voice; u.lang = voice.lang; } else u.lang = 'vi-VN';
+      u.pitch = pitch; u.rate = rate; u.volume = 1;
+      u.onstart = function(){ if (id !== speakId) return; speaking = true; wordPulse = 1; if (fxOn && mode !== 'natural') humOn(); };
+      u.onboundary = function(){ if (id === speakId) wordPulse = 1; };
+      u.onend = u.onerror = function(){
+        if (id !== speakId) return; pending--;
+        if (pending <= 0){ speaking = false; humOff(); if (fxOn && mode !== 'natural') beep(880, 1320); }
+      };
+      synth.speak(u);
+    });
+    return true;
+  } catch(err){ return false; }
+}
+
+/* ---------------- Trạng thái biểu cảm ---------------- */
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+var cur = clone(EXPR[0]), tgt = clone(EXPR[0]);
+var shapes = {e0:cur.eyes[0].s, e1:cur.eyes[1].s, m:cur.mouth.s};
+var morph = 1, talking = false, talkUntil = 0, auto = true, lookOn = true, autoNext = 0;
+var blinkT = 0, nextBlink = 2.5, blinkMul = 1;
+
+function lerpObj(a, b, k){
+  for (var key in b){
+    if (typeof b[key] === 'number') a[key] += (b[key]-a[key])*k;
+    else if (b[key] && typeof b[key] === 'object') lerpObj(a[key], b[key], k);
+  }
+}
+var activeIdx = 0;
+function setExpr(i, silent, faceOnly){
+  activeIdx = i; var e = EXPR[i];
+  tgt = clone(e);
+  if (e.eyes[0].s!==shapes.e0 || e.eyes[1].s!==shapes.e1 || e.mouth.s!==shapes.m) morph = 0;
+  targetColor.set(e.color);
+  document.documentElement.style.setProperty('--c', e.color);
+  document.getElementById('mood').textContent = e.name;
+  document.getElementById('code').textContent = 'MODE ' + String(i+1).padStart(2,'0');
+  if (!faceOnly){ typeLine(e.line);
+  talkUntil = (!silent && speak(e.line)) ? clock + .6 : clock + Math.min(3.2, .9 + e.line.length*.045); }
+  btns.forEach(function(b,k){ b.setAttribute('aria-pressed', k===i ? 'true':'false'); });
+}
+var typeTimer = null;
+var typingFull = null;
+function typeLine(txt){
+  var el = document.getElementById('say'); var n = 0; clearInterval(typeTimer); typingFull = txt;
+  var buoc = Math.max(1, Math.ceil(txt.length / 220));          // câu dài thì hiện nhanh hơn
+  typeTimer = setInterval(function(){ n += buoc; el.textContent = txt.slice(0,n); if (n>=txt.length){ clearInterval(typeTimer); typingFull = null; } }, 24);
+}
+
+/* ---------------- Vẽ khuôn mặt ---------------- */
+function glow(c, b){ fx.shadowColor = c; fx.shadowBlur = b; }
+function eye(e, shape, x, y, side, mul, t){
+  var w = e.w, h = e.h*mul, col = '#' + color.getHexString();
+  fx.fillStyle = col; fx.strokeStyle = col; fx.lineCap='round'; fx.lineJoin='round';
+  if (h < 2 && shape==='oval') { fx.lineWidth = 12; fx.beginPath(); fx.moveTo(x-w/2,y); fx.lineTo(x+w/2,y); fx.stroke(); return; }
+  if (shape==='oval'){
+    fx.save();
+    var top = y - h/2, bot = y + h/2, lidY = function(xr){ var inner = xr*(-side)/(w/2); return top + e.lid*h + e.tilt*inner*h*.28; };
+    fx.beginPath(); fx.moveTo(x-w, lidY(-w)); fx.lineTo(x+w, lidY(w)); fx.lineTo(x+w, bot+20); fx.lineTo(x-w, bot+20); fx.closePath(); fx.clip();
+    fx.beginPath(); fx.ellipse(x, y, w/2, Math.max(h/2,1), 0, 0, Math.PI*2); fx.fill();
+    fx.shadowBlur = 0; fx.fillStyle = 'rgba(255,255,255,.55)';
+    fx.beginPath(); fx.ellipse(x - w*.14, y - h*.18, w*.12, Math.max(h*.1,1), 0, 0, Math.PI*2); fx.fill();
+    fx.restore();
+  } else if (shape==='arcUp'){
+    fx.lineWidth = 24; fx.beginPath(); fx.arc(x, y + w*.28, w/2, Math.PI*1.12, Math.PI*1.88); fx.stroke();
+  } else if (shape==='heart'){
+    var s = w*.72*(1 + .07*Math.sin(t*7)) * mul;
+    fx.beginPath(); fx.moveTo(x, y+s*.42);
+    fx.bezierCurveTo(x-s*.95, y-s*.2, x-s*.5, y-s*.95, x, y-s*.42);
+    fx.bezierCurveTo(x+s*.5, y-s*.95, x+s*.95, y-s*.2, x, y+s*.42); fx.fill();
+  } else if (shape==='star'){
+    var R = w/2*mul, r = R*.44, rot = t*1.2*side;
+    fx.beginPath(); for (var k=0;k<10;k++){ var rr = k%2?r:R, a = rot - Math.PI/2 + k*Math.PI/5; fx.lineTo(x+Math.cos(a)*rr, y+Math.sin(a)*rr); } fx.closePath(); fx.fill();
+  } else if (shape==='spiral'){
+    fx.lineWidth = 11; fx.beginPath();
+    for (var a2=0; a2<Math.PI*5; a2+=.12){ var rr2 = a2/(Math.PI*5)*w/2*mul, ang = a2 + t*4*side; fx.lineTo(x+Math.cos(ang)*rr2, y+Math.sin(ang)*rr2); }
+    fx.stroke();
+  }
+}
+function mouth(m, shape, x, y, alpha, t){
+  var col = '#' + color.getHexString(); fx.globalAlpha = alpha;
+  fx.strokeStyle = col; fx.fillStyle = col; fx.lineWidth = 14; fx.lineCap='round'; fx.lineJoin='round';
+  var w = m.w, o = m.o;
+  if (shape==='o'){
+    fx.beginPath(); fx.ellipse(x, y, w/2*(.8+o*.3), w/2*(.7+o*.6), 0, 0, Math.PI*2); fx.stroke();
+    fx.globalAlpha = alpha*.25; fx.fill();
+  } else if (shape==='zig'){
+    fx.beginPath(); var n=7; for (var i=0;i<=n;i++){ fx.lineTo(x-w/2+i*w/n, y + (i%2?-16:16) + Math.sin(t*6+i)*3); } fx.stroke();
+  } else {
+    var lx = x-w/2, rx = x+w/2, ly = y + m.sl, ry = y - m.sl, cy = y + m.c*72;
+    if (o > .04){
+      fx.beginPath(); fx.moveTo(lx,ly); fx.quadraticCurveTo(x, cy - o*12, rx, ry); fx.quadraticCurveTo(x, cy + o*120, lx, ly); fx.closePath();
+      fx.globalAlpha = alpha*.28; fx.fill(); fx.globalAlpha = alpha; fx.stroke();
+    } else { fx.beginPath(); fx.moveTo(lx,ly); fx.quadraticCurveTo(x, cy, rx, ry); fx.stroke(); }
+  }
+  fx.globalAlpha = 1;
+}
+function drawFace(t, look){
+  fx.clearRect(0,0,FW,FH);
+  var col = '#' + color.getHexString();
+  var ex = 175, ey = 330, cx = FW/2;
+  var mulShape = morph < 1 ? Math.abs(Math.cos(morph*Math.PI)) : 1;
+  var lx = lookOn ? look.x*22 : 0, ly = lookOn ? -look.y*14 : 0;
+  glow(col, 34);
+  [0,1].forEach(function(i){
+    var side = i===0 ? -1 : 1, e = cur.eyes[i];
+    var sh = i===0 ? shapes.e0 : shapes.e1;
+    var bm = sh==='oval' ? blinkMul : 1;
+    eye(e, sh, cx + side*ex + e.dx + lx, ey + e.dy + ly, side, mulShape*bm, t);
+    // Lông mày
+    var b = cur.brows[i], by = ey - 128 + b.y + e.dy*.5 + ly*.5, bx = cx + side*ex + e.dx*.5 + lx*.6;
+    fx.globalAlpha = cur.browA; fx.lineWidth = 13; fx.lineCap='round'; fx.strokeStyle = col;
+    fx.beginPath(); fx.moveTo(bx + side*62, by - b.t*62); fx.lineTo(bx - side*62, by + b.t*62); fx.stroke(); fx.globalAlpha = 1;
+  });
+  if (cur.blush > .02){
+    glow('#FF6FA8', 30); fx.fillStyle = 'rgba(255,111,168,' + (.45*cur.blush) + ')';
+    [-1,1].forEach(function(s){ fx.beginPath(); fx.ellipse(cx + s*(ex+40), ey + 118, 52, 22, 0, 0, Math.PI*2); fx.fill(); });
+    glow(col, 34);
+  }
+  var mo = clone(cur.mouth);
+  if (talking || speaking || clock < talkUntil){ var v = Math.abs(Math.sin(t*13)*Math.sin(t*4.7+1)); mo.o = Math.max(mo.o, .12 + v*.45 + wordPulse*.3); }
+  mouth(mo, shapes.m, cx + lx*.5, 600 + mo.dy + ly*.4, mulShape, t);
+  if (cur.scan > .02){
+    fx.globalAlpha = cur.scan*.5; fx.lineWidth = 3; var sy = 140 + ((t*220) % 560);
+    fx.beginPath(); fx.moveTo(cx-330, sy); fx.lineTo(cx+330, sy); fx.stroke();
+    fx.globalAlpha = cur.scan*.35; fx.strokeRect(cx-330, 130, 660, 580);
+    fx.globalAlpha = 1;
+  }
+  if (cur.zzz > .02){
+    fx.fillStyle = col; fx.font = '600 56px "Chakra Petch", sans-serif';
+    for (var k=0;k<3;k++){ var p = ((t*.35 + k/3) % 1); fx.globalAlpha = cur.zzz*(1-p); fx.fillText('z', cx + 250 + p*90, 260 - p*190); }
+    fx.globalAlpha = 1;
+  }
+  fx.shadowBlur = 0;
+  faceTex.needsUpdate = true;
+}
+
+/* ---------------- Tương tác ---------------- */
+var yaw = 0, pitch = 0, vYaw = 0, vPitch = 0, dragging = false, px0=0, py0=0, look = {x:0,y:0}, lookT = {x:0,y:0};
+canvas.addEventListener('pointerdown', function(e){ dragging = true; px0=e.clientX; py0=e.clientY; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerup', function(){ dragging = false; });
+canvas.addEventListener('pointercancel', function(){ dragging = false; });
+window.addEventListener('pointermove', function(e){
+  lookT.x = (e.clientX / window.innerWidth)*2-1; lookT.y = -((e.clientY / window.innerHeight)*2-1);
+  if (!dragging) return;
+  var dx = e.clientX-px0, dy = e.clientY-py0; px0=e.clientX; py0=e.clientY;
+  vYaw = dx*.006; vPitch = dy*.004; yaw += vYaw; pitch = Math.max(-.6, Math.min(.6, pitch + vPitch));
+});
+canvas.addEventListener('wheel', function(e){ e.preventDefault(); camDist = Math.max(4.2, Math.min(11, camDist + e.deltaY*.004)); }, {passive:false});
+
+var btns = [];
+function toggle(id, fn){ var el = document.getElementById(id); el.addEventListener('click', function(){ var on = el.getAttribute('aria-pressed')!=='true'; el.setAttribute('aria-pressed', on?'true':'false'); fn(on); }); }
+toggle('tLook', function(on){ lookOn = on; });
+toggle('tVoice', function(on){ voiceOn = on; if (!on && synth){ synth.cancel(); speaking = false; humOff(); } });
+toggle('tFx', function(on){ fxOn = on; if (!on) humOff(); });
+/* ---------------- Bộ não offline: WebLLM chạy mô hình mã nguồn mở ngay trên máy người dùng ---------------- */
+var engine = null, loading = false, busy = false, chatLog = [];
+var bstat = document.getElementById('bstat'), bbar = document.getElementById('bbar'), bLoad = document.getElementById('bLoad');
+var histEl = document.getElementById('hist'), logEl = document.getElementById('log'), lastEvent = null, lastEvId = 0;
+function addMsg(cls, text, title){
+  var d = document.createElement('div'); d.className = 'msg ' + cls;
+  if (title){ var t = document.createElement('div'); t.className = 'tt'; t.textContent = title; d.appendChild(t); }
+  d.appendChild(document.createTextNode(text)); histEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight; return d;
+}
+function commit(){            // đưa câu trả lời đang hiện vào lịch sử để khung dưới sẵn sàng cho câu tiếp theo
+  var t = ((typingFull || sayEl.textContent) + '').trim();
+  clearInterval(typeTimer); typingFull = null; sayEl.textContent = '';
+  if (t && t !== '…') addMsg('bot', t);
+}
+new MutationObserver(function(){ logEl.scrollTop = logEl.scrollHeight; }).observe(document.getElementById('say'), {childList:true, characterData:true, subtree:true});
+var mSel = document.getElementById('mSel'), bSend = document.getElementById('bSend'), sayEl = document.getElementById('say'), youEl = document.getElementById('you');
+var MOOD_IDS = EXPR.map(function(e){ return e.id; });
+var IDLE = ['neutral','listen','thinking','focused','wink','neutral'].map(function(id){ return MOOD_IDS.indexOf(id); }).filter(function(i){ return i >= 0; });
+function idx(id){ var i = MOOD_IDS.indexOf(id); return i < 0 ? 0 : i; }
+var SYS = 'Bạn là AURON, trợ lý AI dạng hologram: lịch sự, điềm tĩnh, hơi hài hước, gọi người dùng là "ngài". ' +
+  'Luôn trả lời bằng tiếng Việt, ngắn gọn, tối đa 3 câu. ' +
+  'Mở đầu mỗi câu trả lời bằng đúng một nhãn cảm xúc trong ngoặc vuông, chọn một trong: ' + MOOD_IDS.map(function(m){ return '[' + m + ']'; }).join(' ') +
+  '. Ví dụ: "[happy] Rất vui được giúp ngài!"' +
+  ' Bạn là người hướng dẫn phần mềm Echem Studio (xử lý và vẽ số liệu điện hóa). Khi có mục "TÀI LIỆU" bên dưới, chỉ trả lời dựa trên tài liệu đó, đúng tên nút và tên tab trong tài liệu; ' +
+  'không có trong tài liệu thì nói thẳng là chưa có hướng dẫn, không bịa. Khi có mục "KẾT QUẢ PHÂN TÍCH GẦN NHẤT" thì giải thích và đánh giá thêm dựa trên đó. Hỏi số liệu của file đã nạp thì chỉ ngài sang tab "Hỏi đáp" của Echem Studio.';
+function sysFor(q){
+  var c = window.TroGiup ? TroGiup.nguCanh(q, lastEvent ? 1300 : 1800) : '';
+  var r = SYS;
+  if (c) r += '\n\nTÀI LIỆU:\n' + c;
+  if (lastEvent) r += '\n\nKẾT QUẢ PHÂN TÍCH GẦN NHẤT CỦA APP (số liệu do app tính; khi ngài hỏi về kết quả hãy dựa vào đây, không thêm số liệu khác):\n' + String(lastEvent.chi_tiet).slice(0, 1400);
+  return r;
+}
+function clean(t){ return t.replace(/\[[a-zA-Z_ -]{2,14}\]\s*/g, '').trim(); }
+function guessMood(t){
+  var s = t.toLowerCase();
+  if (/haha|hihi|buồn cười/.test(s)) return 'laugh';
+  if (/xin lỗi|rất tiếc|tiếc là|buồn/.test(s)) return 'sad';
+  if (/cảm ơn|yêu|quý|thích/.test(s)) return 'love';
+  if (/tuyệt|vui|chúc mừng|hoàn tất|xong rồi/.test(s)) return 'happy';
+  if (/ồ|wow|thật sao|bất ngờ/.test(s)) return 'surprised';
+  if (/không chắc|có lẽ|hmm|để tôi/.test(s)) return 'thinking';
+  return 'neutral';
+}
+function status(msg, pct){
+  bstat.textContent = msg;
+  if (pct == null) bbar.style.display = 'none';
+  else { bbar.style.display = 'block'; bbar.firstChild.style.width = Math.round(Math.max(0, Math.min(1, pct))*100) + '%'; }
+}
+function reply(mood, txt){ setExpr(idx(mood), true, true); typeLine(txt); if (!speak(txt)) talkUntil = clock + Math.min(5, .9 + txt.length*.045); }
+if (!navigator.gpu){
+  bLoad.disabled = true; mSel.disabled = true;
+  status('Cửa sổ này chưa có WebGPU nên chưa chạy được bộ não (cần Windows 10/11 mới, trình điều khiển card đồ họa mới và Edge WebView2 bản mới). AURON vẫn tra cứu được hướng dẫn của Echem Studio.');
+}
+bLoad.addEventListener('click', async function(){
+  if (engine || loading) return;
+  loading = true; bLoad.disabled = true; mSel.disabled = true;
+  status('Đang tải thư viện WebLLM…', 0);
+  try {
+    var webllm = await import('./vendor/web-llm.js');
+    var ids = webllm.prebuiltAppConfig.model_list.map(function(m){ return m.model_id; });
+    var want = mSel.value;
+    if (ids.indexOf(want) < 0){ var alt = ids.filter(function(id){ return /^Qwen.*Instruct.*q4f16/i.test(id); }); want = alt[0] || ids[0]; }
+    engine = await webllm.CreateMLCEngine(want, { initProgressCallback: function(r){ status('Đang nạp bộ não: ' + (r.text || ''), r.progress || 0); } });
+    status('Bộ não đã sẵn sàng (' + want.replace(/-q4f16.*$/, '') + '). Mọi suy nghĩ của AURON diễn ra trên máy của ngài, không gửi đi đâu.');
+    bLoad.textContent = 'Bộ não: đang chạy';
+    try { localStorage.setItem('auron_auto', mSel.value); } catch(e){}
+    reply('happy', 'Hệ thống thần kinh đã trực tuyến. Tôi có thể trò chuyện cùng ngài.');
+  } catch(err){
+    engine = null; bLoad.disabled = false; mSel.disabled = false;
+    status('Không nạp được bộ não (' + (err && err.message ? err.message : err) + '). Hãy thử mô hình nhẹ hơn, đóng bớt tab, hoặc kiểm tra mạng.');
+    reply('sad', 'Rất tiếc, tôi chưa khởi động được bộ não.');
+  }
+  loading = false;
+});
+function rules(q, chiGio){
+  var s = q.toLowerCase(), d = new Date();
+  var thu = ['Chủ nhật','thứ Hai','thứ Ba','thứ Tư','thứ Năm','thứ Sáu','thứ Bảy'];
+  if (/mấy giờ|giờ rồi|bây giờ là mấy/.test(s)) return ['neutral', 'Bây giờ là ' + d.getHours() + ' giờ ' + d.getMinutes() + ' phút, thưa ngài.'];
+  if (/hôm nay|ngày mấy|thứ mấy/.test(s)) return ['neutral', 'Hôm nay là ' + thu[d.getDay()] + ', ngày ' + d.getDate() + ' tháng ' + (d.getMonth()+1) + ' năm ' + d.getFullYear() + '.'];
+  if (chiGio) return null;
+  if (/bạn là ai|tên gì|tên của bạn/.test(s)) return ['proud', 'Tôi là AURON, trợ lý hologram của ngài.'];
+  if (/cảm ơn|cám ơn/.test(s)) return ['love', 'Rất hân hạnh được phục vụ ngài.'];
+  if (/tạm biệt|đi ngủ|bye/.test(s)) return ['sleepy', 'Tôi sẽ nghỉ một chút. Ngài cần thì gọi tôi nhé.'];
+  if (/xin chào|chào|hello|\bhi\b/.test(s)) return ['happy', 'Xin chào ngài! AURON luôn sẵn sàng.'];
+  return null;
+}
+document.getElementById('sayForm').addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  var inp = document.getElementById('sayIn'), q = inp.value.trim(); if (!q || busy) return;
+  inp.value = ''; commit(); addMsg('you', q);
+  if (!engine){
+    if (lastEvent && /kết quả|đánh giá|nhận xét|vừa (rồi|xong)|mẫu nào/i.test(q)){ reply(lastEvent.mood || 'neutral', lastEvent.chi_tiet); return; }
+    var ngan = q.length <= 28, r = rules(q, !ngan), tl = (!r && window.TroGiup) ? TroGiup.traLoiNhanh(q) : null;
+    if (r) reply(r[0], r[1]);
+    else if (tl) reply('proud', tl.text);
+    else reply('confused', 'Tôi chưa tìm thấy mục hướng dẫn nào khớp câu hỏi. Ngài thử nêu tên phép đo hoặc công cụ (LSV, Tafel, ECSA, EIS, GCD, XPS, XRD...), hoặc bấm "Kích hoạt bộ não" để tôi trả lời tự do. Hỏi số liệu của file đã nạp thì dùng tab "Hỏi đáp" của Echem Studio.');
+    return;
+  }
+  var rg = rules(q, true);
+  if (rg){ reply(rg[0], rg[1]); return; }
+  busy = true; bSend.disabled = true;
+  setExpr(idx('thinking'), true, true); clearInterval(typeTimer); sayEl.textContent = '…';
+  chatLog.push({role:'user', content:q}); if (chatLog.length > 12) chatLog = chatLog.slice(-12);
+  try {
+    var stream = await engine.chat.completions.create({ messages:[{role:'system', content:sysFor(q)}].concat(chatLog), stream:true, temperature:.7, max_tokens:300 });
+    var full = '';
+    for await (var ch of stream){
+      var piece = (ch.choices && ch.choices[0] && ch.choices[0].delta && ch.choices[0].delta.content) || '';
+      full += piece; sayEl.textContent = clean(full) || '…'; talkUntil = clock + .35;
+    }
+    var tag = full.match(/\[([a-zA-Z]+)\]/), mood = tag && MOOD_IDS.indexOf(tag[1].toLowerCase()) >= 0 ? tag[1].toLowerCase() : guessMood(full);
+    var text = clean(full) || '…';
+    chatLog.push({role:'assistant', content:full.trim()});
+    setExpr(idx(mood), true, true); sayEl.textContent = text; speak(text);
+  } catch(err){
+    reply('confused', 'Có lỗi khi suy nghĩ: ' + (err && err.message ? err.message : err));
+  }
+  busy = false; bSend.disabled = false;
+});
+
+document.getElementById('tReset').addEventListener('click', function(){ yaw = 0; pitch = 0; vYaw = 0; vPitch = 0; camDist = 8; });
+
+function resize(){
+  var w = window.innerWidth, h = window.innerHeight, ch = document.getElementById('chat');
+  var dich = (ch && w > 760) ? (ch.offsetWidth + 16) / 2 : 0;       // dời hologram sang trái để không bị khung trả lời che
+  renderer.setSize(w, h, false); camera.aspect = w/h; camera.setViewOffset(w, h, dich, 0, w, h); camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------------- Vòng lặp ---------------- */
+var clock = 0, last = performance.now();
+setExpr(0, true, true);
+function frame(now){
+  var dt = Math.min(.05, (now-last)/1000); last = now; clock += dt; var t = clock;
+  lerpObj(cur, tgt, Math.min(1, dt*7));
+  color.lerp(targetColor, Math.min(1, dt*5));
+  if (morph < 1){ var before = morph; morph = Math.min(1, morph + dt/.32); if (before < .5 && morph >= .5){ shapes.e0 = tgt.eyes[0].s; shapes.e1 = tgt.eyes[1].s; shapes.m = tgt.mouth.s; } }
+  // chớp mắt
+  blinkT += dt; if (blinkT > nextBlink){ var p = (blinkT-nextBlink)/.16; blinkMul = p<1 ? Math.abs(Math.cos(p*Math.PI)) : 1; if (p>=1){ blinkT = 0; nextBlink = 2.2 + Math.random()*3.5; } }
+  if (auto && t > autoNext){
+    if (!busy && !speaking && clock > talkUntil && !loading){ var n; do { n = IDLE[Math.floor(Math.random()*IDLE.length)]; } while (n===activeIdx && IDLE.length > 1); setExpr(n, true, true); }
+    autoNext = t + 6 + Math.random()*5;
+  }
+
+  wordPulse *= Math.pow(.02, dt);
+  look.x += (lookT.x - look.x)*Math.min(1,dt*4); look.y += (lookT.y - look.y)*Math.min(1,dt*4);
+  if (!dragging){ yaw += vYaw; vYaw *= .93; vPitch *= .9; pitch *= .985; }
+  root.rotation.y = yaw; root.rotation.x = pitch*.6;
+  var lk = lookOn ? 1 : 0;
+  head.rotation.y = look.x*.28*lk;
+  head.rotation.x = cur.nod - look.y*.14*lk;
+  head.rotation.z = cur.tiltZ + Math.sin(t*.8)*.015;
+  root.position.y = Math.sin(t*1.6)*.05*cur.bob + .15;
+  if (cur.bob > 1.6) head.position.y = Math.abs(Math.sin(t*9))*.035*(cur.bob-1.6); else head.position.y *= .9;
+
+  r1.rotation.z += dt*.35*cur.ring; r2.rotation.z -= dt*.22*cur.ring; arc.rotation.z += dt*.6*cur.ring; arc2.rotation.z -= dt*.9*cur.ring; ticks.rotation.y += dt*.12*cur.ring;
+  ears.forEach(function(g,i){ g.userData.inner.rotation.z += dt*2*cur.ring*(i?1:-1); });
+  core.rotation.y += dt*.6*cur.ring; core.rotation.x += dt*.3;
+  var pulse = 1 + .12*Math.sin(t*3*cur.ring); coreDot.scale.setScalar(pulse);
+  points.rotation.y += dt*.06*cur.part; points.rotation.x = Math.sin(t*.2)*.05;
+  var jit = 1 + .015*Math.sin(t*cur.part*4); points.scale.setScalar(jit);
+  pmat.opacity = .45 + .25*Math.min(cur.part,2)/2;
+  crest.rotation.y += dt*1.5;
+  wire.material.opacity = .08 + .04*Math.sin(t*2);
+  mats.forEach(function(m){ m.uniforms.uTime.value = t; });
+  basicMats.forEach(function(m){ m.color.copy(color); });
+
+  camera.position.set(0, .1, camDist); camera.lookAt(0, -.76, 0);
+  drawFace(t, look);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+var CHAO = 'Xin chào ngài. Tôi là AURON, trợ lý của Echem Studio. Sau khi ngài phân tích hoặc vẽ xong, tôi sẽ nhận xét số liệu ngay tại đây; ngài cũng có thể hỏi tôi cách làm, công thức, tiêu chí và lỗi thường gặp của từng phép đo.';
+setExpr(idx('neutral'), true, true); typeLine(CHAO);
+function hienSuKien(e){
+  commit(); lastEvent = e;
+  addMsg('dg', e.chi_tiet, '📊 ' + (e.tieu_de || 'Đánh giá dữ liệu') + (e.nguon ? ' · ' + e.nguon : '') + (e.luc ? ' · ' + e.luc : ''));
+  setExpr(idx(e.mood || 'neutral'), true, true);
+  if (!(e.tom_tat && speak(e.tom_tat))) talkUntil = clock + Math.min(5, .9 + (e.tom_tat || '').length*.045);
+}
+async function hoiSuKien(dau){
+  if (busy || loading) return;
+  try {
+    var r = await fetch('su_kien?sau=' + lastEvId, {cache:'no-store'}), ds = await r.json();
+    if (!ds.length) return;
+    ds.forEach(function(e){ lastEvId = Math.max(lastEvId, e.id); });
+    if (dau) ds = ds.filter(function(e){ return Date.now()/1000 - (e.epoch || 0) <= 1800; }).slice(-1);     // mới mở: chỉ nhắc nhận xét gần nhất (trong 30 phút)
+    ds.forEach(hienSuKien);
+  } catch(x){}
+}
+hoiSuKien(true);
+setInterval(function(){ if (!document.hidden) hoiSuKien(false); }, 2500);
+(function(){                         // bảng điều khiển: kéo để di chuyển, nút ◂/▸ để thu gọn sang trái, nhớ vị trí
+  var ctl = document.getElementById('ctl'), head = document.getElementById('ctlHead'), mn = document.getElementById('ctlMin'), drag = null;
+  function luu(){ try { var r = ctl.getBoundingClientRect(), m = ctl.classList.contains('min'); localStorage.setItem('auron_ctl', JSON.stringify({x: Math.round(m ? parseFloat(ctl.style.left) || 12 : r.left), y: Math.round(r.top), min: m})); } catch(e){} }
+  try { var st = JSON.parse(localStorage.getItem('auron_ctl') || 'null'); if (st){ ctl.style.left = Math.max(0, Math.min(window.innerWidth - 60, st.x)) + 'px'; ctl.style.top = Math.max(0, Math.min(window.innerHeight - 60, st.y)) + 'px'; if (st.min){ ctl.classList.add('min'); mn.textContent = '▸'; } } } catch(e){}
+  head.addEventListener('pointerdown', function(e){ if (e.target === mn) return; var r = ctl.getBoundingClientRect(); drag = {dx: e.clientX - r.left, dy: e.clientY - r.top}; head.setPointerCapture(e.pointerId); });
+  head.addEventListener('pointermove', function(e){
+    if (!drag) return;
+    ctl.style.left = Math.max(0, Math.min(window.innerWidth - 60, e.clientX - drag.dx)) + 'px';
+    ctl.style.top = Math.max(0, Math.min(window.innerHeight - 60, e.clientY - drag.dy)) + 'px';
+  });
+  head.addEventListener('pointerup', function(){ if (drag){ drag = null; luu(); } });
+  mn.addEventListener('click', function(){ var m = ctl.classList.toggle('min'); mn.textContent = m ? '▸' : '◂'; luu(); });
+})();
+var GOI_Y = ['Giải thích kết quả vừa rồi', 'Cách xử lý GCD cho siêu tụ lai?', 'Làm sao tính Tafel?', 'Cách tính ECSA từ CV?', 'Lỗi thường gặp khi nạp file?', 'Bản mới có gì?'];
+GOI_Y.forEach(function(t){
+  var b = document.createElement('button'); b.type = 'button'; b.textContent = t;
+  b.addEventListener('click', function(){ document.getElementById('sayIn').value = t; document.getElementById('sayForm').requestSubmit(); });
+  document.getElementById('goiY').appendChild(b);
+});
+if (window.TroGiup){
+  TroGiup.tai('kien_thuc.json').then(function(n){
+    if (navigator.gpu) status('Đã nạp ' + n + ' mục hướng dẫn của Echem Studio: AURON tra cứu được ngay, chưa cần bộ não. Kích hoạt bộ não (tải một lần, sau đó chạy offline) để trả lời tự nhiên hơn.');
+    var m = null; try { m = localStorage.getItem('auron_auto'); } catch(e){}
+    if (m && navigator.gpu && !engine && !loading){ for (var i = 0; i < mSel.options.length; i++) if (mSel.options[i].value === m) mSel.selectedIndex = i; bLoad.click(); }
+  }).catch(function(){ status('Chưa nạp được hướng dẫn của app (kien_thuc.json). AURON chỉ hiểu lệnh cơ bản.'); });
+}
+})();
+
+</script>
+</body>
+</html>
