@@ -101,7 +101,7 @@ GOI_Y = {
     "goi_nop_bai": "Kèm báo cáo Excel: Bảng nộp bài, Lặp lại (TB ± SD), Kiểm tra nộp bài, file methods_dien_hoa.txt và goi_tai_lap.zip (dữ liệu thô + kết quả + thông số).",
     "tafel": "Vùng mật độ dòng (mA/cm²) dùng để fit đường Tafel (E theo log|J|) trên đường LSV/CV.\nVới LSV có pic nhỏ, app chỉ lấy nhánh đi lên sau cùng.\n(Tafel từ Qs-LSV: dùng công cụ Qs-LSV.)",
     "tafel_e": "Vùng điện thế (V) dùng để fit Tafel, ví dụ 1.40 đến 1.55. Chọn 'Theo điện thế' ở bên trái. Cần ít nhất 3 điểm trong vùng.",
-    "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel (từ Qs-LSV), ECSA, cảnh báo, thông số đã dùng, VÀ số liệu đã xử lý để vẽ hình (sheet Vẽ CV/LSV/IT/EIS/Tafel, kèm biểu đồ Excel dựng sẵn).",
+    "xuat_excel": "Tạo file bao_cao_tong_hop.xlsx: Epa/Ipa, quá thế, Tafel (từ Qs-LSV), ECSA, cảnh báo, thông số đã dùng, VÀ dữ liệu thô + dữ liệu đã xử lý bằng CÔNG THỨC Excel (sheet Thô/Xử lý CV, LSV, IT, EIS, Tafel, ECSA_CV_DaTocDo, kèm biểu đồ) để kiểm chứng từng con số.",
     "i_muc_tieu": "Các mật độ dòng mục tiêu (mA/cm²) để báo cáo điện thế/quá thế, cách nhau dấu phẩy. Ví dụ: 10, 100.",
     "e_can_bang": "Điện thế cân bằng (V vs RHE) để tính quá thế. OER: 1.23 V; HER: 0 V.",
     "le_max": "Khoảng cách từ dữ liệu lớn nhất đến đầu trục, tính theo số bước chia chính (0.5 = nửa bước).",
@@ -906,6 +906,7 @@ class App:
             gd.ap_kieu(self.root)
             dau = gd.dai_logo(main, "Echem Studio", f"Xử lý & vẽ số liệu điện hóa  ·  phiên bản {self.phien_ban}", kich_thuoc=40)
             dau.pack(fill="x", padx=4, pady=(2, 4))
+            ttk.Button(dau, text="🤖 Hỏi AURON", command=self.mo_auron).pack(side="right", padx=12)
 
         # ================= THANH CÔNG CỤ (ribbon): bấm tên nhóm để mở/đóng =================
         self.tabbar = ttk.Frame(main)
@@ -1228,7 +1229,7 @@ class App:
 
     def dung_tab_tro_giup(self, tab):
         g = self.nhom_ribbon(tab, "Trợ giúp")
-        for ten, lenh in (("Hướng dẫn", self.mo_huong_dan), ("Dữ liệu mẫu", self.mo_du_lieu_mau), ("Giới thiệu", self.mo_gioi_thieu)):
+        for ten, lenh in (("🤖 Hỏi AURON", self.mo_auron), ("Hướng dẫn", self.mo_huong_dan), ("Dữ liệu mẫu", self.mo_du_lieu_mau), ("Giới thiệu", self.mo_gioi_thieu)):
             ttk.Button(g, text=ten, command=lenh).pack(side="left", padx=4, pady=4)
         g = self.nhom_ribbon(tab, "Hướng dẫn theo phép đo")
         self.hd_phep_do = tk.StringVar(value="")
@@ -1334,6 +1335,38 @@ class App:
         if hd:
             self.q.put("\n" + hd.GOI_Y + "\n")
 
+    def tao_ngu_canh(self):
+        """NguCanh (file + thông số quy đổi hiện tại) dùng cho tab Hỏi đáp và đánh giá của AURON. Phải gọi ở luồng giao diện. Lỗi nhập → ValueError."""
+        if not self.muc:
+            raise ValueError("Chưa chọn file số liệu nào (mục 1).")
+        loai = self.loai.get()
+        nc = hd.NguCanh([(m["path"], m["nhan"]) for m in self.muc],
+                        self.so(self.ph, "pH"), self.so(self.eref, "Eref"),
+                        self.so(self.nhan_i, "hệ số nhân I", duong=True),
+                        self.so(self.chia_i, "hệ số chia I", duong=True),
+                        loai if loai in ("LSV", "CV", "IT", "EIS") else None,
+                        r_s=self.so_khong_am(self.r_s, "Rs"), ir_pct=self.so(self.ir_pct, "% bù iR", duong=True),
+                        khong_rhe=self.khong_rhe.get(), nernst=self.so(self.nernst, "hệ số Nernst", duong=True))
+        for ten, bien in (("tai_trong", self.tai_trong), ("so_mol_tam", self.so_mol_tam),
+                          ("khoi_luong_mol", self.khoi_luong_mol), ("ti_le_tam", self.ti_le_tam),
+                          ("qua_the_ht", self.qua_the_ht), ("n_e", self.n_e), ("i_muc_tieu", self.i_muc_tieu),
+                          ("e_can_bang", self.e_can_bang)):
+            setattr(nc.a, ten, bien.get().strip() or None)
+        nc.a.e_can_bang = self.so(self.e_can_bang, "E cân bằng")
+        return nc
+
+    def danh_gia_auron(self, log=""):
+        """Sau khi phân tích/vẽ xong: AURON đánh giá số liệu (luồng nền; mọi lỗi bị bỏ qua, không ảnh hưởng luồng chính)."""
+        try:
+            import auron_danh_gia as dg
+            nc = self.tao_ngu_canh()                       # đọc ô nhập ở luồng giao diện, phần nặng làm ở luồng nền
+        except Exception:
+            return
+        threading.Thread(target=lambda: dg.danh_gia_nen(lambda: nc, log), daemon=True).start()
+        p = getattr(self, "auron_proc", None)
+        if p is None or p.poll() is not None:
+            self.q.put("AURON đã ghi nhận xét về dữ liệu vừa xử lý: bấm '🤖 Hỏi AURON' để xem.\n")
+
     def hoi_dap(self):
         if self.dang_hd or hd is None:
             return
@@ -1341,22 +1374,7 @@ class App:
         if not cau:
             return
         try:
-            if not self.muc:
-                raise ValueError("Chưa chọn file số liệu nào (mục 1).")
-            loai = self.loai.get()
-            nc = hd.NguCanh([(m["path"], m["nhan"]) for m in self.muc],
-                            self.so(self.ph, "pH"), self.so(self.eref, "Eref"),
-                            self.so(self.nhan_i, "hệ số nhân I", duong=True),
-                            self.so(self.chia_i, "hệ số chia I", duong=True),
-                            loai if loai in ("LSV", "CV", "IT", "EIS") else None,
-                            r_s=self.so_khong_am(self.r_s, "Rs"), ir_pct=self.so(self.ir_pct, "% bù iR", duong=True),
-                            khong_rhe=self.khong_rhe.get(), nernst=self.so(self.nernst, "hệ số Nernst", duong=True))
-            for ten, bien in (("tai_trong", self.tai_trong), ("so_mol_tam", self.so_mol_tam),
-                              ("khoi_luong_mol", self.khoi_luong_mol), ("ti_le_tam", self.ti_le_tam),
-                              ("qua_the_ht", self.qua_the_ht), ("n_e", self.n_e), ("i_muc_tieu", self.i_muc_tieu),
-                              ("e_can_bang", self.e_can_bang)):
-                setattr(nc.a, ten, bien.get().strip() or None)
-            nc.a.e_can_bang = self.so(self.e_can_bang, "E cân bằng")
+            nc = self.tao_ngu_canh()
         except ValueError as e:
             messagebox.showwarning("Thông báo", str(e))
             return
@@ -1450,8 +1468,8 @@ class App:
             if n == 0:
                 messagebox.showinfo("Thông báo", "Không tìm thấy file .txt/.csv/.dat mới trong thư mục này.")
 
-    MODULE_CAN = ("xu_ly_dien_hoa", "ve_origin", "so_sanh", "cong_cu", "hoi_dap", "canh_bao", "bao_cao", "nop_bai", "nop_bai_gui", "doi_chieu", "hinh_tap_chi", "hinh_tap_chi_gui", "hieu_suat", "fit_eis", "hinh_bai_bao",
-                  "pho_xy", "ecsa_tuong_tac", "tof_cv", "qs_lsv", "nhan_dang_nhanh", "loi_than_thien", "mau_du_lieu", "tu_dong_cap_nhat", "hrtem", "hrtem_gui", "ij_nhung", "xps", "xps_gui", "ve_xps_origin", "xrd", "xrd_ngan_hang", "xrd_gui", "ve_xrd_origin", "gcd_pin", "gcd_pin_gui", "ve_gcd_origin", "huong_dan_phep_do", "huong_dan_gui", "dien_cuc_so_sanh")
+    MODULE_CAN = ("xu_ly_dien_hoa", "ve_origin", "so_sanh", "cong_cu", "hoi_dap", "canh_bao", "bao_cao", "bao_cao_cong_thuc", "nop_bai", "nop_bai_gui", "doi_chieu", "hinh_tap_chi", "hinh_tap_chi_gui", "hieu_suat", "fit_eis", "hinh_bai_bao",
+                  "pho_xy", "ecsa_tuong_tac", "tof_cv", "qs_lsv", "nhan_dang_nhanh", "loi_than_thien", "mau_du_lieu", "tu_dong_cap_nhat", "hrtem", "hrtem_gui", "ij_nhung", "xps", "xps_gui", "ve_xps_origin", "xrd", "xrd_ngan_hang", "xrd_gui", "ve_xrd_origin", "gcd_pin", "gcd_pin_gui", "ve_gcd_origin", "huong_dan_phep_do", "huong_dan_gui", "dien_cuc_so_sanh", "auron_cua_so", "auron_danh_gia")
 
     def kiem_file_ma_nguon(self):
         """Báo rõ nếu thư mục ma_nguon thiếu file .py (thường do build cũ / cập nhật dở)."""
@@ -1460,6 +1478,51 @@ class App:
             self.q.put("[CẢNH BÁO] Thiếu file trong thư mục chương trình: " + ", ".join(m + ".py" for m in thieu) +
                        ".\nMột số chức năng (vd TOF, Qs-LSV, ECSA tương tác) sẽ báo lỗi 'No module named ...'. "
                        "Cách sửa: bấm 'Kiểm tra cập nhật' hoặc chép các file này vào thư mục ma_nguon.\n")
+
+    def mo_auron(self):
+        """AURON: trợ lý hỏi đáp & trợ giúp, mở thành cửa sổ riêng (tiến trình con, WebView2), không mở trình duyệt."""
+        p = getattr(self, "auron_proc", None)
+        if p is not None and p.poll() is None:
+            messagebox.showinfo("AURON", "AURON đang mở rồi (xem cửa sổ AURON trên thanh tác vụ).")
+            return
+        try:
+            import auron_cua_so as au
+        except Exception as e:
+            messagebox.showerror("AURON", "Không mở được AURON:\n" + str(e) + "\n\nCách sửa: bấm 'Kiểm tra cập nhật' để lấy file auron_cua_so.py và thư mục auron_web.")
+            return
+        if not os.path.isfile(os.path.join(THU_MUC, "auron_web", "index.html")):
+            messagebox.showerror("AURON", "Thiếu thư mục auron_web (giao diện AURON).\nCách sửa: bấm 'Kiểm tra cập nhật' hoặc cài lại bản mới.")
+            return
+        if not au.co_webview():
+            messagebox.showinfo("AURON", "AURON cần thư viện pywebview để mở cửa sổ riêng trong app.\n\n"
+                                "• Chạy từ mã nguồn: mở Command Prompt, gõ  python -m pip install pywebview  rồi mở lại app.\n"
+                                "• Bản exe: cần build lại bằng build.bat (bản mới đã gồm pywebview).\n\n"
+                                "Máy cần Microsoft Edge WebView2 (Windows 10/11 thường có sẵn).")
+            return
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        try:
+            import tempfile
+            self.auron_log = os.path.join(tempfile.gettempdir(), "echem_auron_log.txt")      # ghi ra file để ống stderr không bao giờ đầy
+            with open(self.auron_log, "w", encoding="utf-8") as lg:
+                self.auron_proc = subprocess.Popen(self.lenh_con("auron_cua_so.py", "--worker-auron"), stdin=subprocess.DEVNULL, stdout=lg,
+                                                   stderr=subprocess.STDOUT, cwd=THU_MUC, env=env,
+                                                   **({"creationflags": CO_CONSOLE} if os.name == "nt" else {}))
+        except OSError as e:
+            messagebox.showerror("AURON", f"Không khởi động được AURON: {e}")
+            return
+        self.root.after(4000, self._kiem_auron)
+
+    def _kiem_auron(self):
+        p = getattr(self, "auron_proc", None)
+        if p is None or p.poll() is None:
+            return                                   # đang chạy bình thường
+        try:
+            with open(self.auron_log, encoding="utf-8", errors="replace") as lg:
+                loi = lg.read().strip()
+        except Exception:
+            loi = ""
+        messagebox.showerror("AURON", "AURON dừng ngay sau khi mở." + (f"\n\n{loi[-600:]}" if loi else "") +
+                             "\n\nThường do thiếu pywebview hoặc Microsoft Edge WebView2.")
 
     def mo_cong_cu_qs(self):
         CongCuQsTof(self)
@@ -2253,7 +2316,7 @@ class App:
         if lt:
             lt.ghi_nhat_ky(DATA_DIR, f"KẾT THÚC ({che_do}): {ket}", van_ban if ket == "loi" else f"{so_canh_bao} cảnh báo")
         self.cap_nhat_json_chay(ket)
-        self.q.put(("chay_xong", che_do, ket))
+        self.q.put(("chay_xong", che_do, ket, van_ban))
 
     # ---------- lưu thông số mỗi lần chạy (để tái lập kết quả) ----------
     def ghi_thong_so_chay(self, lenh, thu_muc_ra):
@@ -2427,7 +2490,7 @@ class App:
             self.dang_hd = False
             self.nut_hd.config(state="normal")
         elif m[0] == "chay_xong":
-            _, che_do, ket = m
+            _, che_do, ket = m[:3]
             self.dang_chay = False
             self.che_do = None
             self.proc = None
@@ -2437,6 +2500,8 @@ class App:
             self.nut_dung.config(state="disabled")
             if che_do == "xem_truoc" and ket == "thanh_cong":
                 self.mo_xem_truoc()
+            if ket == "thanh_cong" and self.muc:
+                self.danh_gia_auron(m[3] if len(m) > 3 else "")
         elif m[0] == "xong_cap_nhat":
             _, ok, msg = m
             self.dang_chay = False
@@ -2650,7 +2715,7 @@ class App:
 
 def main():
     # Che do worker: exe tu goi lai chinh no de xu ly / ve
-    if len(sys.argv) > 1 and sys.argv[1] in ("--worker-origin", "--worker-csv", "--worker-xps-origin", "--worker-xrd-origin", "--worker-gcd-origin"):
+    if len(sys.argv) > 1 and sys.argv[1] in ("--worker-origin", "--worker-csv", "--worker-xps-origin", "--worker-xrd-origin", "--worker-gcd-origin", "--worker-auron"):
         mode = sys.argv.pop(1)
         # exe PyInstaller bo qua PYTHONIOENCODING -> ep stdout/stderr dung UTF-8 de in duoc tieng Viet
         for luong in (sys.stdout, sys.stderr):
@@ -2658,6 +2723,9 @@ def main():
                 luong.reconfigure(encoding="utf-8", errors="replace")
             except Exception:
                 pass
+        if mode == "--worker-auron":
+            import auron_cua_so
+            sys.exit(auron_cua_so.main())
         if mode == "--worker-origin":
             import ve_origin as m
         elif mode == "--worker-xps-origin":

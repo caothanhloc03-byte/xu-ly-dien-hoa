@@ -216,6 +216,7 @@ def duong_cv_lsv(m, chu_ky=None):
 def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None, e_min=None, e_max=None):
     i_val = d[COT_I].to_numpy()
     e_val = d[COT_E].to_numpy()
+    vt = np.arange(len(i_val))               # vị trí dòng gốc của từng điểm (để báo cáo Excel trỏ công thức về đúng dòng số liệu)
 
     # LSV có pic oxi hóa nhỏ ở điện thế thấp (vd Cu ~0.87 V): chỉ lấy NHÁNH SAU CÙNG đi lên qua v_min,
     # để pic không lọt vào vùng Tafel. Chỉ áp dụng khi E đơn điệu (LSV); CV hai chiều giữ nguyên.
@@ -224,7 +225,7 @@ def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None, e_min=None, e_max=None):
     if not theo_e and len(dE) and (np.all(dE >= -1e-9) or np.all(dE <= 1e-9)):
         duoi = np.where(np.abs(i_val) < v_min)[0]
         if len(duoi) and duoi[-1] < len(i_val) - 3:
-            i_val, e_val = i_val[duoi[-1] + 1:], e_val[duoi[-1] + 1:]
+            i_val, e_val, vt = i_val[duoi[-1] + 1:], e_val[duoi[-1] + 1:], vt[duoi[-1] + 1:]
 
     # Lấy vùng từ 9mA đến 11mA (hoặc -9mA đến -11mA đối với dòng khử); hoặc theo khoảng điện thế nếu được chọn
     if theo_e:
@@ -235,6 +236,7 @@ def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None, e_min=None, e_max=None):
         mask = (np.abs(i_val) >= v_min) & (np.abs(i_val) <= v_max)
     sub_i = i_val[mask]
     sub_e = e_val[mask]
+    sub_vt = vt[mask]
     
     if len(sub_i) < 3 and not theo_e:
         # Nếu dòng không đủ rộng, lấy khoảng tự động quanh 10mA
@@ -242,6 +244,7 @@ def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None, e_min=None, e_max=None):
         sel = idx_sort[:min(30, len(i_val))]
         sub_i = i_val[sel]
         sub_e = e_val[sel]
+        sub_vt = vt[sel]
     
     log_j = np.log10(np.abs(sub_i))
     a_slope, b_int = np.polyfit(log_j, sub_e, 1)
@@ -250,8 +253,11 @@ def xu_ly_tafel(d, v_min=9.0, v_max=11.0, ten=None, e_min=None, e_max=None):
     df_tafel = pd.DataFrame({
         "Log(J)": log_j,
         "Potential (V vs RHE)": sub_e,
-        "I (mA/cm2)": sub_i
+        "I (mA/cm2)": sub_i,
+        "_vt": sub_vt
     }).sort_values("Log(J)").reset_index(drop=True)
+    vt_sap_xep = df_tafel.pop("_vt").to_numpy()
+    df_tafel.attrs["vi_tri_dong_goc"] = [int(x) for x in vt_sap_xep]
 
     if ten is not None and canh_bao:          # ten=None: không cảnh báo (vd gọi từ hỏi đáp)
         canh_bao.kiem_tra_tafel(df_tafel, tafel_slope, v_min, v_max, ten, theo_e=theo_e)

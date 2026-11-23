@@ -202,6 +202,11 @@ class CuaSo:
     def dung(self):
         if self.ap_dung:
             self.ap_dung(self.e, self.bo_qua())
+        try:
+            import auron_danh_gia as _ag
+            _ag.thu_ghi(_ag.tu_ecsa, tinh(self.cac, self.e, self.cs, self.bo_qua()), self.e, self.cs, self.bo_qua())
+        except Exception:  # noqa: BLE001
+            pass
         self.w.destroy()
 
     # ---- vẽ

@@ -271,6 +271,7 @@ TOPICS = [
                   "Khối lượng hoạt tính (mg) của từng mẫu (tự điền nếu file CS Studio có ghi)."],
          buoc=["Tab Phân tích ▸ nhóm 'Siêu tụ lai & Pin' ▸ '⚡ Mở công cụ...'.",
                "Tab ①: Thêm file... (hoặc lấy từ danh sách file của app); khối lượng (mg) tự điền từ file CS Studio, các file khác thì nhập; bấm ⚙ nếu app đoán sai cột.",
+               "Nhanh nhất: ô 'Gợi ý theo vật liệu' tự đặt loại tế bào, đại lượng chính, bộ công thức và cách tính C (tụ lớp kép / giả tụ / siêu tụ lai / pin).",
                "Chọn Loại tế bào: 3 điện cực/1 điện cực (C/m, như Excel của bạn), cell 2 điện cực tính theo tổng khối lượng (C/m), hoặc 2 điện cực đối xứng (4C/m).",
                "Chọn Bộ công thức: 'Kiểu file Excel của bạn' (ΔV gồm IR drop, E = ½CΔV²) hoặc 'Chuẩn' (bỏ IR drop, E tích phân); có thể chỉnh riêng ΔV, cách tính C, cách tính E.",
                "(Nếu đo 3 điện cực) mục 'Điện cực so sánh': tick 'Vẽ điện thế theo RHE', chọn Hg/HgO, Ag/AgCl... rồi nhập pH.",
@@ -282,6 +283,10 @@ TOPICS = [
                     ("Năng lượng, công suất", "E = ½·C·ΔV²·1000/3600 (Wh/kg); P = E·3600/Δt (W/kg)", "Cách tính E khác: ½C(V²−V₀²) hoặc ∫V·I dt."),
                     ("Điện tích", "Q = ∫|I| dt; Qsp = Q/(3.6·m) (mAh/g)", ""),
                     ("ESR", "ESR = ΔV_IR / (2I)", ""),
+                    ("τ và P_max", "τ = ESR·C; P_max = (V_đỉnh − V_cuối)²/(4·ESR)", "P_max chia khối lượng/diện tích đã nhập; chỉ có nghĩa với cell 2 điện cực."),
+                    ("Điện dung (năng lượng)", "C = 2·I·∫(V − V_cuối)dt / ΔV²", "Cho đường xả phi tuyến (giả tụ, lai); trùng C = Q/ΔV khi đường xả thẳng."),
+                    ("Khả năng tốc độ", "Csp(j) / Csp(j thấp nhất) × 100 %", "Sheet 'Khả năng tốc độ' và một dòng trong bảng kết quả (cần ≥ 2 mức dòng)."),
+                    ("Cân bằng khối lượng", "m₊/m₋ = (C₋·ΔV₋)/(C₊·ΔV₊)", "Nút '⚖ Cân bằng khối lượng m₊/m₋...': nhập Csp và ΔV của từng điện cực đo 3 điện cực."),
                     ("Thời gian chu kỳ", "chu kỳ nạp–xả = t nạp + t xả", ""),
                     ("Csp 2 điện cực đối xứng", "Csp = 4C/m, m = tổng khối lượng", "Stoller & Ruoff 2010; không dùng cho cell bất đối xứng (siêu tụ lai).")],
          tieu_chi=["Đường xả tam giác (R² ≥ 0.985, ngưỡng của app) → dạng tụ, báo F/g; có plateau (R² < 0.93) → dạng pin, báo mAh/g (ngưỡng là quy ước của app).",
@@ -289,7 +294,7 @@ TOPICS = [
                    "CE > 100 % là dấu hiệu tách nạp/xả sai hoặc phản ứng phụ; khối lượng < 1 mg app cảnh báo."],
          loi=["Chiều nạp sai (điện thế giảm khi nạp) → tick đúng 'Điện thế GIẢM khi nạp'.", "File không có cột dòng → nhập dòng không đổi (mA).",
               "Chọn nhầm Loại tế bào: 2 điện cực đối xứng nhân 4 lần so với 3 điện cực."],
-         ket_qua=["Excel 7 sheet (có 'Thời gian chu kỳ'), CSV từng đồ thị, hình PNG/PDF/TIFF, file Origin."], xem_them=["gcd nhieu", "csp", "ragone", "retention", "ce", "dien cuc"]),
+         ket_qua=["Excel 8 sheet (có 'Thời gian chu kỳ' và 'Khả năng tốc độ'), CSV từng đồ thị, hình PNG/PDF/TIFF, file Origin."], xem_them=["gcd nhieu", "csp", "ragone", "retention", "ce", "dien cuc"]),
 
     dict(id="gcd nhieu", ten="GCD nhiều chu kỳ: đường V–t dài có ô phóng đại chu kỳ đầu/cuối", loai_app=None, cong_cu="gcd",
          bi_danh=["gcd nhieu", "nhieu chu ky", "cycling", "cycle life", "tuoi tho", "bien dang v t", "4500 cycles", "5000 cycles", "initial cycles", "final cycles", "o phong dai", "inset", "bo ben"],
@@ -420,6 +425,21 @@ TOPICS = [
          phep_tinh=[("RHE", "E(RHE) = E đo + k × pH + Eref", "k = 0.059 (mặc định, khớp Excel) hoặc 0.0592; Eref chọn nhanh trong ô 'Điện cực' (Hg/HgO, Ag/AgCl, SCE...)."), ("Mật độ dòng", "I (mA/cm²) = i × 1000 × nhân ÷ chia", "")],
          tieu_chi=["Cảnh báo tự động: E sau quy đổi ngoài −1.5…3.5 V vs RHE; dòng > 5000 hoặc < 10⁻⁴ mA/cm²."], loi=["Nhập Eref của điện cực khác loại (Ag/AgCl vs Hg/HgO...)."],
          ket_qua=["Sheet 'Thông tin' ghi thông số đã dùng."], xem_them=["lsv", "bu ir"], thuc_te=lambda c: _thuc_te_quy_doi(c)),
+    dict(id="auron", ten="AURON: trợ lý hỏi đáp & trợ giúp (hologram)", loai_app=None,
+         bi_danh=["auron", "tro ly", "hologram", "hoi dap tro giup", "chatbot", "ai", "bo nao", "qwen", "webgpu"],
+         tom_tat="AURON là trợ lý hologram trong cửa sổ riêng của app, trả lời cách làm, công thức, tiêu chí và lỗi thường gặp của từng phép đo. "
+                 "Hỏi tra cứu chạy ngay không cần AI; bật 'bộ não' (mô hình Qwen chạy ngay trên máy) để trả lời tự nhiên hơn, dựa trên đúng hướng dẫn của app. "
+                 "Sau khi app phân tích/vẽ xong (CV, LSV, IT, EIS) hoặc công cụ Siêu tụ lai & Pin phân tích xong, AURON tự nhận xét số liệu trong khung trả lời.",
+         du_lieu=["Không cần dữ liệu. Muốn bật bộ não: Windows 10/11 có WebGPU (Edge WebView2 mới, driver card đồ họa mới) và mạng cho lần tải mô hình đầu tiên (0,4–2 GB)."],
+         buoc=["Bấm '🤖 Hỏi AURON' ở đầu cửa sổ app (hoặc tab Trợ giúp).", "Gõ câu hỏi hoặc bấm một ô 'Hỏi nhanh'; AURON tra hướng dẫn của app và trả lời ngay.",
+               "Muốn trả lời tự do: bấm 'Kích hoạt bộ não', chọn Qwen 0.5B/1.5B/3B, chờ tải xong (một lần). Các lần sau AURON tự bật lại và chạy offline.",
+               "Hỏi số liệu của chính các file đã nạp (điện thế tại 10 mA, Tafel, ECSA...) thì dùng tab Hỏi đáp của app.",
+               "Sau khi bấm CHẠY xong (hoặc Phân tích trong công cụ ⚡), mở/nhìn cửa sổ AURON: nhận xét hiện ở khung trả lời (xếp hạng mẫu, Tafel, độ bền IT, EIS, GCD kèm lưu ý). Hỏi 'giải thích kết quả vừa rồi' để nghe thêm.",
+               "Bảng điều khiển nhỏ bên trái: kéo thanh trên cùng để di chuyển, bấm ◂ để thu gọn sang trái. Biểu cảm của AURON tự thay đổi theo nội dung."],
+         phep_tinh=[], tieu_chi=["Mô hình nhỏ có thể sai; AURON được yêu cầu chỉ trả lời theo tài liệu của app và nói thẳng khi chưa có hướng dẫn. Kiểm tra lại số liệu quan trọng."],
+         loi=["Báo thiếu pywebview: chạy  python -m pip install pywebview  (bản exe cần build lại bằng build.bat).", "Không bật được bộ não: máy/WebView2 chưa hỗ trợ WebGPU; AURON vẫn tra cứu hướng dẫn bình thường.",
+              "Chữ trả lời bị đọc to không mong muốn: tắt nút 'Đọc to' trong cửa sổ AURON."],
+         ket_qua=["Câu trả lời hiện trong cửa sổ AURON; mô hình đã tải lưu trong thư mục dữ liệu của app, không gửi gì ra ngoài."], xem_them=["quy doi"]),
 ]
 THEO_ID = {t["id"]: t for t in TOPICS}
 

@@ -19,7 +19,16 @@ DAI_LUONG = {"Theo thiết lập chung": "theo_chung", "Điện dung riêng (F/g
 DAI_LUONG_CK = dict(DAI_LUONG, **{"Thời gian xả (s), như file Excel": "thoi_gian_xa"})
 DAI_LUONG_CSP = {"Điện dung riêng Csp (F/g)": "dien_dung", "Dung lượng riêng (mAh/g)": "dung_luong", "Theo thiết lập chung": "theo_chung"}
 KIEU_VE_CSP = {"Cột (như hình mẫu)": "cot", "Đường + điểm": "duong"}
-CACH_C = {"Tích phân điện tích C = Q/ΔV = I·Δt/ΔV": "tich_phan", "Độ dốc C = I/|dV/dt|": "do_doc"}
+CACH_C = {"Tích phân điện tích C = Q/ΔV = I·Δt/ΔV": "tich_phan", "Độ dốc C = I/|dV/dt|": "do_doc",
+          "Năng lượng C = 2I∫V dt/ΔV² (đường xả phi tuyến)": "nang_luong"}
+# gợi ý thiết lập theo loại vật liệu (bảng 1 của hướng dẫn): tế bào, đại lượng chính, bộ công thức
+VAT_LIEU = {
+    "(chọn để tự đặt thiết lập gợi ý)": None,
+    "Tụ lớp kép (carbon): cell đối xứng 2 điện cực → F/g": ("2dc", "dien_dung", "chuan", "tich_phan"),
+    "Giả tụ (RuO₂, MnO₂, polymer): 3 điện cực → F/g (+ mAh/g)": ("3dc", "dien_dung", "chuan", "nang_luong"),
+    "Siêu tụ lai (bất đối xứng): cell 2 điện cực → mAh/g": ("2dc_cell", "dung_luong", "chuan", "nang_luong"),
+    "Pin / điện cực kiểu pin (Ni(OH)₂, Co₃O₄…): → mAh/g": ("3dc", "dung_luong", "chuan", "tich_phan"),
+}
 CACH_E = {"E = ½C·ΔV² (như file Excel)": "cv2_dv", "E = ½C(V² − V₀²) (tụ lý tưởng)": "cv2", "E = ∫V·I dt (mọi đường cong)": "tich_phan"}
 CACH_E_RAG = dict({"Theo thiết lập chung": None}, **CACH_E)
 CACH_DV = {"ΔV = V đỉnh nạp − V cuối xả (gồm IR drop, như file Excel)": "gom_ir", "ΔV = V_ext − V cuối xả (bỏ IR drop, chuẩn)": "tru_ir"}
@@ -195,6 +204,8 @@ class CuaSoGcd:
         cb(g1, 1, "Chuẩn hóa theo:", "chuan", CHUAN, next(iter(CHUAN)), 18, self.doi_chuan)
         cb(g1, 2, "Chiều nạp:", "chieu", CHIEU, next(iter(CHIEU)), 24)
         cb(g1, 3, "Đại lượng chính:", "chinh", CHINH, next(iter(CHINH)), 34)
+        cb(g1, 4, "Gợi ý theo vật liệu:", "vat_lieu", VAT_LIEU, next(iter(VAT_LIEU)), 34, self.chon_vat_lieu)
+        ttk.Button(g1, text="⚖ Cân bằng khối lượng m₊/m₋...", command=self.can_bang_kl).grid(row=5, column=0, columnspan=2, sticky="w", padx=6, pady=(2, 4))
         cb(g2, 0, "Bộ công thức:", "bo_ct", BO_CT, next(iter(BO_CT)), 30, self.chon_bo_ct)
         cb(g2, 1, "ΔV:", "dv", CACH_DV, next(iter(CACH_DV)), 44)
         cb(g2, 2, "Cách tính C:", "cach_c", CACH_C, next(iter(CACH_C)), 44)
@@ -385,6 +396,46 @@ class CuaSoGcd:
         self.cv["cach_c"].set(next(k for k, v in CACH_C.items() if v == "tich_phan"))
         self.v_tt.set("Đã đổi bộ công thức: bấm ▶ Phân tích để tính lại.")
 
+    def chon_vat_lieu(self):
+        g = VAT_LIEU[self.cv["vat_lieu"].get()]
+        if not g:
+            return
+        cell, chinh, bo, cach_c = g
+        self.cv["cell"].set(next(k for k, v in KIEU_CELL.items() if v == cell))
+        self.cv["chinh"].set(next(k for k, v in CHINH.items() if v == chinh))
+        self.cv["bo_ct"].set(next(k for k, v in BO_CT.items() if v == bo))
+        self.chon_bo_ct()
+        self.cv["cach_c"].set(next(k for k, v in CACH_C.items() if v == cach_c))
+        self.v_tt.set("Đã đặt thiết lập gợi ý (loại tế bào, đại lượng chính, bộ công thức 'Chuẩn', cách tính C). Chỉnh lại nếu cần rồi bấm ▶ Phân tích.")
+
+    def can_bang_kl(self):
+        """Hộp thoại m₊/m₋ = (C₋·ΔV₋)/(C₊·ΔV₊): nhập Csp và cửa sổ điện thế của từng điện cực (đo 3 điện cực)."""
+        d = tk.Toplevel(self.w)
+        d.title("Cân bằng khối lượng điện cực dương / âm")
+        d.transient(self.w)
+        f = ttk.Frame(d, padding=10)
+        f.pack(fill="both", expand=True)
+        ttk.Label(f, text="Để hai điện cực tích cùng điện tích:  m₊/m₋ = (C₋·ΔV₋) / (C₊·ΔV₊)\n"
+                          "Nhập Csp (F/g) và cửa sổ điện thế ΔV (V) của từng điện cực, đo ở hệ 3 điện cực.", justify="left").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
+        v = {k: tk.StringVar() for k in ("cd", "vd", "ca", "va")}
+        for r, (nh, k) in enumerate((("Điện cực dương: Csp⁺ (F/g)", "cd"), ("Điện cực dương: ΔV⁺ (V)", "vd"),
+                                      ("Điện cực âm: Csp⁻ (F/g)", "ca"), ("Điện cực âm: ΔV⁻ (V)", "va")), 1):
+            ttk.Label(f, text=nh).grid(row=r, column=0, sticky="e", padx=(0, 6), pady=2)
+            ttk.Entry(f, textvariable=v[k], width=10).grid(row=r, column=1, sticky="w")
+        kq_v = tk.StringVar()
+        ttk.Label(f, textvariable=kq_v, foreground="#0a4d8c", justify="left", wraplength=420).grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 2))
+
+        def tinh():
+            try:
+                x = {k: float(a.get().replace(",", ".")) for k, a in v.items()}
+                r = gp.can_bang_khoi_luong(x["cd"], x["vd"], x["ca"], x["va"])
+            except ValueError as e:
+                kq_v.set("⚠ " + (str(e) if "dương" in str(e) else "Nhập đủ bốn số."))
+                return
+            kq_v.set(f"m₊/m₋ = {r['ty_le']:.3g}   (dương {r['phan_duong']:.1f} % : âm {r['phan_am']:.1f} % tổng khối lượng hoạt tính)")
+        ttk.Button(f, text="Tính", command=tinh).grid(row=5, column=1, sticky="w", pady=(6, 0))
+        ttk.Button(f, text="Đóng", command=d.destroy).grid(row=7, column=2, sticky="e", pady=(8, 0))
+
     def chon_dien_cuc(self):
         v = dc.eref_cua(self.cv["dien_cuc"].get())
         if v is not None:
@@ -558,6 +609,13 @@ class CuaSoGcd:
             messagebox.showerror("Siêu tụ/Pin", f"Lỗi khi phân tích: {e}", parent=self.w)
             self.v_tt.set("Lỗi.")
             return
+        try:                                            # AURON nhận xét kết quả (nếu cửa sổ AURON đang mở sẽ hiện ngay); lỗi ở đây không được làm hỏng phân tích
+            import auron_danh_gia
+            ev = auron_danh_gia.tu_gcd(self.kq)
+            if ev:
+                auron_danh_gia.ghi_su_kien(ev)
+        except Exception:  # noqa: BLE001
+            pass
         self.txt.delete("1.0", "end")
         self.txt.insert("1.0", gp.tom_tat(self.kq))
         self.txt_ct.delete("1.0", "end")

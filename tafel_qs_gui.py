@@ -392,10 +392,18 @@ class CuaSoTafelQs:
             messagebox.showinfo("Tafel", "Chưa có mẫu nào fit được.", parent=self.w)
         return cac
 
+    def _nhan_xet(self, cac):
+        try:
+            import auron_danh_gia as _ag
+            _ag.thu_ghi(_ag.tu_tafel_qs, cac)
+        except Exception:  # noqa: BLE001
+            pass
+
     def xuat(self):
         cac = self._cac_co_kq()
         if not cac:
             return
+        self._nhan_xet(cac)
         ky, e0 = self.kieu_y()
         try:
             ra = tq.xuat(cac, self.thu_muc, "Tafel_QsLSV", ky, e0)
@@ -410,6 +418,7 @@ class CuaSoTafelQs:
         cac = self._cac_co_kq()
         if not cac:
             return
+        self._nhan_xet(cac)
         p = os.path.join(self.thu_muc, "Tafel_QsLSV.json")
         try:
             tq.luu_json(p, [tq.ban_ghi(c["nhan"], c["kq"]) for c in cac])
@@ -425,6 +434,7 @@ class CuaSoTafelQs:
         cac = self._cac_co_kq()
         if not cac:
             return
+        self._nhan_xet(cac)
         ky, e0 = self.kieu_y()
         p = os.path.join(self.thu_muc, "Tafel_QsLSV_origin.json")
         try:

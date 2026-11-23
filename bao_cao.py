@@ -248,7 +248,7 @@ def _so_lieu_ve(a, ds):
 
 
 
-def tao_noi_dung(a, ds):
+def tao_noi_dung(a, ds, so_lieu_gia_tri=False):
     """Trả về list[(ten_sheet, [dict hàng])] hoặc (ten, [(khóa, giá trị)]) cho 'Thông tin'."""
     CAU_TRUC.clear()
     import cong_cu
@@ -307,9 +307,9 @@ def tao_noi_dung(a, ds):
             sheets.append(("Tafel (Qs-LSV)", _bang_tafel_qs()))
         if nhom.get("loi"):
             sheets.append(("Lỗi đọc file", nhom["loi"]))
-        if not getattr(a, "khong_so_lieu_ve", False):
+        if so_lieu_gia_tri and not getattr(a, "khong_so_lieu_ve", False):      # chỉ khi KHÔNG có openpyxl (xuất CSV): số liệu vẽ dạng giá trị
             try:
-                sheets.extend(_so_lieu_ve(a, ds))          # số liệu đã xử lý để vẽ hình (kèm biểu đồ Excel dựng sẵn)
+                sheets.extend(_so_lieu_ve(a, ds))
             except Exception as e:  # noqa: BLE001 - lỗi phần phụ không được làm mất báo cáo chính
                 print(f"  (canh bao) khong xuat duoc so lieu ve hinh: {e}")
     for khoa, ten_sheet in (("so_sanh", "So sánh mẫu"), ("so_sanh_nhom", "Nhóm (TB ± SD)"), ("so_sanh_tai_lieu", "So sánh tài liệu"),
@@ -323,7 +323,7 @@ def tao_noi_dung(a, ds):
 
 
 # ====================== GHI FILE ======================
-def _ghi_xlsx(duong, sheets):
+def _ghi_xlsx(duong, sheets, a=None, ds=None):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -357,64 +357,19 @@ def _ghi_xlsx(duong, sheets):
                 for c in r:
                     c.fill = PatternFill("solid", fgColor=mau[r[0].value])
         ws.freeze_panes = "A2"
-        if ten in CAU_TRUC and hang:
-            try:
-                _ve_bieu_do(ws, CAU_TRUC[ten], len(hang), len(cot), ten)
-            except Exception as e:  # noqa: BLE001
-                print(f"  (canh bao) khong dung duoc bieu do Excel cho sheet {ten}: {e}")
+    if a is not None and not getattr(a, "khong_so_lieu_ve", False):
+        try:
+            import bao_cao_cong_thuc
+            truoc = len(wb.sheetnames)
+            bao_cao_cong_thuc.them_vao(wb, a, ds or [])
+            moi = wb._sheets[truoc:]                      # đặt các sheet công thức trước "Cảnh báo" / "Thông tin"
+            if moi:
+                wb._sheets = wb._sheets[:truoc]
+                vt = next((i for i, w in enumerate(wb._sheets) if w.title == "Cảnh báo"), len(wb._sheets))
+                wb._sheets[vt:vt] = moi
+        except Exception as e:  # noqa: BLE001 - lỗi phần phụ không được làm mất báo cáo chính
+            print(f"  (canh bao) khong tao duoc cac sheet cong thuc: {e}")
     wb.save(duong)
-
-
-def _hex(m):
-    try:
-        from matplotlib.colors import to_hex
-        return to_hex(m).lstrip("#").upper()
-    except Exception:
-        return None
-
-
-def _ve_bieu_do(ws, cs, n_hang, n_cot, ten):
-    """Biểu đồ phân tán (scatter) dựng sẵn từ các cặp cột X-Y của sheet 'Vẽ ...', đặt bên phải bảng số liệu."""
-    from openpyxl.chart import Reference, ScatterChart, Series
-    from openpyxl.chart.layout import Layout, ManualLayout  # noqa: F401
-    g = cs["cot"]
-    ch = ScatterChart()
-    ch.style = 2
-    ch.scatterStyle = "lineMarker"
-    ch.height, ch.width = 11, 18
-    ch.x_axis.title, ch.y_axis.title = cs["x"], cs["y"]
-    ch.x_axis.delete = False
-    ch.y_axis.delete = False
-    ch.legend.position = "b"
-    n_mau = n_cot // g
-    for i in range(n_mau):
-        c0 = i * g + 1
-        mau = _hex(cs["mau"][i]) if i < len(cs["mau"]) else None
-        cap = [(c0, c0 + 1, cs["kieu"] == "tafel")]
-        if cs["kieu"] == "tafel":
-            cap.append((c0 + 2, c0 + 3, False))
-        for kx, ky, diem in cap:
-            x = Reference(ws, min_col=kx, min_row=2, max_row=n_hang + 1)
-            y = Reference(ws, min_col=ky, min_row=1, max_row=n_hang + 1)
-            sr = Series(y, x, title_from_data=True)
-            if diem:                                  # Tafel: điểm dữ liệu = chấm tròn, không nối
-                sr.marker.symbol = "circle"
-                sr.marker.size = 5
-                sr.graphicalProperties.line.noFill = True
-                if mau:
-                    sr.marker.graphicalProperties.solidFill = mau
-                    sr.marker.graphicalProperties.line.solidFill = mau
-            else:
-                sr.marker.symbol = "none"
-                sr.smooth = False
-                if mau:
-                    sr.graphicalProperties.line.solidFill = mau
-                sr.graphicalProperties.line.width = 19050
-                if cs["kieu"] == "tafel":
-                    sr.graphicalProperties.line.dashStyle = "dash"
-            ch.series.append(sr)
-    from openpyxl.utils import get_column_letter
-    ws.add_chart(ch, f"{get_column_letter(n_cot + 2)}2")
 
 
 def _ghi_csv(duong, sheets):
@@ -436,7 +391,12 @@ def _ghi_csv(duong, sheets):
 def xuat(a, ds, thu_muc):
     """Xuất báo cáo vào `thu_muc`. Trả về đường dẫn file đã tạo."""
     os.makedirs(thu_muc, exist_ok=True)
-    sheets = tao_noi_dung(a, ds)
+    try:
+        import openpyxl  # noqa: F401
+        co_xlsx = True
+    except ImportError:
+        co_xlsx = False
+    sheets = tao_noi_dung(a, ds, so_lieu_gia_tri=not co_xlsx)
     nop = getattr(a, "goi_nop_bai", False)
     if nop:
         try:
@@ -448,7 +408,7 @@ def xuat(a, ds, thu_muc):
     try:
         import openpyxl  # noqa: F401
         duong = os.path.join(thu_muc, TEN_FILE + ".xlsx")
-        _ghi_xlsx(duong, sheets)
+        _ghi_xlsx(duong, sheets, a, ds)
     except ImportError:
         duong = os.path.join(thu_muc, TEN_FILE + ".csv")
         _ghi_csv(duong, sheets)

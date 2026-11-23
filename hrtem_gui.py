@@ -1007,6 +1007,11 @@ class CuaSoHrTem:
         self.cap_nhat_dinh()
         if self.dinh_ds:
             self.tv.selection_set("0")
+        try:
+            import auron_danh_gia as _ag
+            _ag.thu_ghi(_ag.tu_hrtem_dom, self.dinh_ds, self.ket_qua_ds, self._goi_y, self.nm_px)
+        except Exception:  # noqa: BLE001
+            pass
         else:
             self.v_tt.set("Không thấy đốm nào đủ nổi trong vùng này: thử vùng có vân rõ hơn, vùng lớn hơn, hoặc giảm 'Độ nổi tối thiểu z'.")
             self.ve_pho()
@@ -1151,6 +1156,11 @@ class CuaSoHrTem:
         self.do_ds.append(kq)
         self.cap_nhat_bang()
         self.ve_lai_lop_phu()
+        try:
+            import auron_danh_gia as _ag
+            _ag.thu_ghi(_ag.tu_hrtem_phep_do, self.do_ds)
+        except Exception:  # noqa: BLE001
+            pass
 
     # ---------- quét tự động theo thành phần ----------
     def quet_thanh_phan(self):

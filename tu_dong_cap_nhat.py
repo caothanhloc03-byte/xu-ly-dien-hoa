@@ -27,6 +27,7 @@ ZIP_URL_MAC_DINH = f"https://github.com/{GITHUB_USER}/{GITHUB_REPO}/archive/refs
 
 THU_MUC = os.path.dirname(os.path.abspath(__file__))
 DUOI_FILE_CAP_NHAT = (".py", ".pyw", ".ico", ".json", ".md", ".png")
+THU_MUC_PHU = ("auron_web",)                     # thư mục con cũng được cập nhật (giao diện AURON)
 KHONG_GHI_DE = {"cai_dat.json", "launcher.py"}   # file cấu hình người dùng / file khởi động
 UA = {"User-Agent": "DienHoaOrigin-Updater"}
 
@@ -75,6 +76,16 @@ def kiem_tra_cap_nhat(version_url=VERSION_URL, thu_muc=THU_MUC):
     return moi > doc_phien_ban_cuc_bo(thu_muc), tt, None
 
 
+def _giong_nhau(a, b):
+    try:
+        if os.path.getsize(a) != os.path.getsize(b):
+            return False
+        with open(a, "rb") as fa, open(b, "rb") as fb:
+            return fa.read() == fb.read()
+    except OSError:
+        return False
+
+
 def _tim_thu_muc_nguon(goc):
     """Tìm thư mục (nông nhất) chứa xu_ly_dien_hoa.py trong gói giải nén."""
     tot = None
@@ -111,6 +122,17 @@ def cap_nhat(thong_tin, thu_muc=THU_MUC, log=print):
             if (os.path.isfile(os.path.join(nguon, ten)) and ten not in KHONG_GHI_DE
                     and ten.lower().endswith(DUOI_FILE_CAP_NHAT)):
                 ds.append(ten)
+        for thu_con in THU_MUC_PHU:          # thư mục giao diện AURON: chỉ chép file khác nội dung (tránh ghi lại 7 MB mỗi lần)
+            d_nguon = os.path.join(nguon, thu_con)
+            if os.path.isdir(d_nguon):
+                for g, _, cac in os.walk(d_nguon):
+                    for ten in sorted(cac):
+                        p_nguon = os.path.join(g, ten)
+                        rel = os.path.relpath(p_nguon, nguon).replace("\\", "/")
+                        p_dich = os.path.join(thu_muc, *rel.split("/"))
+                        if os.path.isfile(p_dich) and _giong_nhau(p_nguon, p_dich):
+                            continue
+                        ds.append(rel)
         if "version.json" in ds:            # ghi version.json sau cùng
             ds.remove("version.json")
             ds.append("version.json")
@@ -124,21 +146,23 @@ def cap_nhat(thong_tin, thu_muc=THU_MUC, log=print):
         shutil.rmtree(sao_luu, ignore_errors=True)
         os.makedirs(sao_luu, exist_ok=True)
         for ten in ds:
-            dst = os.path.join(thu_muc, ten)
+            dst = os.path.join(thu_muc, *ten.split("/"))
             co_cu = os.path.exists(dst)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
             if co_cu:
-                shutil.copy2(dst, os.path.join(sao_luu, ten))
+                os.makedirs(os.path.dirname(os.path.join(sao_luu, *ten.split("/"))), exist_ok=True)
+                shutil.copy2(dst, os.path.join(sao_luu, *ten.split("/")))
             da_ghi[ten] = co_cu
-            shutil.copyfile(os.path.join(nguon, ten), dst + ".new")
+            shutil.copyfile(os.path.join(nguon, *ten.split("/")), dst + ".new")
             os.replace(dst + ".new", dst)
             log(f"  đã cập nhật: {ten}")
         return True, "Cập nhật thành công."
     except Exception as e:
         for ten, co_cu in da_ghi.items():          # khôi phục
-            dst = os.path.join(thu_muc, ten)
+            dst = os.path.join(thu_muc, *ten.split("/"))
             try:
                 if co_cu:
-                    shutil.copy2(os.path.join(sao_luu, ten), dst)
+                    shutil.copy2(os.path.join(sao_luu, *ten.split("/")), dst)
                 elif os.path.exists(dst):
                     os.remove(dst)
             except Exception:

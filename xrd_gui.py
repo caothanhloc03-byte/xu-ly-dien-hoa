@@ -184,6 +184,11 @@ class CuaSoXrd:
                     tim.append(q["pha"]["ten"])
         quet = f"tự quét {len(ph)} pha" if not nt else f"giới hạn {'/'.join(nt)} ({len(ph)} pha)"
         self.v_tt.set(f"Xong {len(self.kq)} mẫu ({quet}). Pha xác định được: {', '.join(tim) or 'không có'}. Tab 'So sánh mẫu' cho đỉnh lạ.")
+        try:
+            import auron_danh_gia as _ag
+            _ag.thu_ghi(_ag.tu_xrd, self.kq, self.ss)
+        except Exception:  # noqa: BLE001
+            pass
 
     def so_sanh(self):
         if not self.kq:

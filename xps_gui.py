@@ -298,6 +298,11 @@ class CuaSoXps:
             messagebox.showerror("XPS", str(e), parent=self.w)
             return
         self.hien_ket_qua()
+        try:
+            import auron_danh_gia as _ag
+            _ag.thu_ghi(_ag.tu_xps, self.kq, self.v_mau.get())
+        except Exception:  # noqa: BLE001
+            pass
 
     def hien_ket_qua(self):
         kq = self.kq

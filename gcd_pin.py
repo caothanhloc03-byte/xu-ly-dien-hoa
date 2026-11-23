@@ -23,7 +23,7 @@ CAU_HINH = dict(
     kieu_cell="3dc",          # 2dc: tế bào 2 điện cực đối xứng, Csp điện cực = 4C/m_tổng | 2dc_cell: C_cell/m_tổng | 3dc: C/m (một điện cực, như file Excel)
     cach_dv="gom_ir",         # gom_ir: ΔV = V đỉnh nạp − V cuối xả (gồm IR drop, như file Excel) | tru_ir: ΔV = V_ext − V cuối (bỏ IR drop, Stoller & Ruoff)
     chuan="khoi_luong",       # khoi_luong (m tính bằng mg) | dien_tich (cm²)
-    cach_c="tich_phan",       # tich_phan: C = Q/ΔV | do_doc: C = I/|dV/dt|
+    cach_c="tich_phan",       # tich_phan: C = Q/ΔV | do_doc: C = I/|dV/dt| | nang_luong: C = 2·I·∫(V−V_cuối)dt/ΔV² (đường xả phi tuyến)
     doc_p=0.5,                # cửa sổ độ dốc: từ V_ext xuống V_cuối + p·ΔV (0.5 = Vmax → ½Vmax khi V_cuối ≈ 0)
     cach_e="cv2_dv",          # cv2_dv: E = ½C·ΔV² (như file Excel) | cv2: E = ½C(V_ext² − V_cuối²) | tich_phan: E = ∫V·I dt
     chinh="auto",             # auto | dien_dung | dung_luong
@@ -417,14 +417,24 @@ def don_vi_nhan(cau_hinh):
     return {"C": "F g⁻¹", "Q": "mAh g⁻¹", "j": "A g⁻¹", "E": "Wh kg⁻¹", "P": "W kg⁻¹", "ch": "g"}
 
 
-def _quy_chuan(cau_hinh, gia_tri, I_a, C, Q_c, E_wh, P_w):
-    """Quy về đơn vị riêng. gia_tri: mg (khối lượng) hoặc cm² (diện tích)."""
+def _quy_chuan(cau_hinh, gia_tri, I_a, C, Q_c, E_wh, P_w, P_max_w=float("nan")):
+    """Quy về đơn vị riêng. gia_tri: mg (khối lượng) hoặc cm² (diện tích). P_max_w: công suất cực đại P = V²/(4·ESR) (W, cả cell)."""
     he = 4.0 if cau_hinh["kieu_cell"] == "2dc" else 1.0
     if cau_hinh["chuan"] == "dien_tich":
         A = gia_tri
-        return dict(Csp=he * C / A, Qsp=Q_c / 3.6 / A, j=I_a * 1000.0 / A, Esp=E_wh * 1000.0 / A, Psp=P_w * 1000.0 / A)
+        return dict(Csp=he * C / A, Qsp=Q_c / 3.6 / A, j=I_a * 1000.0 / A, Esp=E_wh * 1000.0 / A, Psp=P_w * 1000.0 / A, Pmax=P_max_w * 1000.0 / A)
     g = gia_tri / 1000.0
-    return dict(Csp=he * C / g, Qsp=Q_c / 3.6 / g, j=I_a / g, Esp=E_wh / (g / 1000.0), Psp=P_w / (g / 1000.0))
+    return dict(Csp=he * C / g, Qsp=Q_c / 3.6 / g, j=I_a / g, Esp=E_wh / (g / 1000.0), Psp=P_w / (g / 1000.0), Pmax=P_max_w / (g / 1000.0))
+
+
+def can_bang_khoi_luong(c_duong, dv_duong, c_am, dv_am):
+    """Cân bằng khối lượng siêu tụ lai/bất đối xứng: để hai điện cực tích cùng điện tích, q+ = q−
+    ⇒ m₊/m₋ = (C₋·ΔV₋)/(C₊·ΔV₊). C là điện dung RIÊNG (F/g, đo ở hệ 3 điện cực), ΔV là cửa sổ điện thế từng điện cực (V)."""
+    for x in (c_duong, dv_duong, c_am, dv_am):
+        if not (x is not None and np.isfinite(x) and x > 0):
+            raise ValueError("Cả bốn giá trị (Csp⁺, ΔV⁺, Csp⁻, ΔV⁻) phải là số dương.")
+    tl = (c_am * dv_am) / (c_duong * dv_duong)
+    return dict(ty_le=tl, phan_duong=tl / (1.0 + tl) * 100.0, phan_am=100.0 / (1.0 + tl))
 
 
 def tinh_xa(t, v, i, nap, xa, cau_hinh, gia_tri, i_const=None):
@@ -491,7 +501,15 @@ def tinh_xa(t, v, i, nap, xa, cau_hinh, gia_tri, i_const=None):
     else:
         C_dd = float("nan")
         cb.append("Cửa sổ độ dốc có < 3 điểm: dùng tích phân.")
-    C = C_dd if (cau_hinh["cach_c"] == "do_doc" and np.isfinite(C_dd)) else C_tp
+    # C từ năng lượng (đường phi tuyến): C = 2·I·∫(V − V_cuối)dt / ΔV², ΔV tính sau IR drop (đoạn xả thật sự)
+    sel_x = vd <= V_ext_ir
+    C_nl = 2.0 * I * _tich_phan(vd[sel_x] - V_cuoi, td[sel_x]) / dv_sl ** 2 if sel_x.sum() >= 2 else float("nan")
+    if cau_hinh["cach_c"] == "do_doc" and np.isfinite(C_dd):
+        C = C_dd
+    elif cau_hinh["cach_c"] == "nang_luong" and np.isfinite(C_nl):
+        C = C_nl
+    else:
+        C = C_tp
     # năng lượng, công suất
     E_tp = _tich_phan(np.abs(vd) * idat, td) / 3600.0
     if cau_hinh.get("cach_e") == "cv2_dv":
@@ -510,11 +528,15 @@ def tinh_xa(t, v, i, nap, xa, cau_hinh, gia_tri, i_const=None):
     else:
         dang = "pin"
     t_nap = float(t[nap["b"]] - t[nap["a"]]) if nap is not None else float("nan")
-    kq = dict(I_A=I, dt_xa=dt_xa, Q_xa_C=Q_d, V_ext=V_ext, V_cuoi=V_cuoi, dV_IR=dv_ir, dV=dv, ESR=ESR, C_F=C,
-              C_tp=C_tp, C_dd=C_dd, E_wh=E_wh, E_tp_wh=E_tp, E_cv2_wh=E_cv2, P_w=P_w, R2=r2, dang=dang,
+    # hằng số thời gian τ = ESR·C (s) và công suất cực đại P_max = V²/(4·ESR) với V = điện thế đỉnh nạp (W, cả cell)
+    tau = ESR * C if np.isfinite(ESR) else float("nan")
+    V_pk = V_nap_cuoi if V_nap_cuoi is not None else float("nan")
+    P_max_w = (V_pk - V_cuoi) ** 2 / (4.0 * ESR) if (np.isfinite(ESR) and ESR > 0 and np.isfinite(V_pk)) else float("nan")
+    kq = dict(I_A=I, dt_xa=dt_xa, Q_xa_C=Q_d, V_ext=V_ext, V_cuoi=V_cuoi, dV_IR=dv_ir, dV=dv, ESR=ESR, C_F=C, tau=tau,
+              C_tp=C_tp, C_dd=C_dd, C_nl=C_nl, E_wh=E_wh, E_tp_wh=E_tp, E_cv2_wh=E_cv2, P_w=P_w, R2=r2, dang=dang,
               t_nap=t_nap, T_ck=(t_nap + dt_xa) if np.isfinite(t_nap) else float("nan"),
               t0=float(t[nap["a"]] if nap is not None else td[0]), t1=float(td[-1]))
-    kq.update(_quy_chuan(cau_hinh, gia_tri, I, C, Q_d, E_wh, P_w))
+    kq.update(_quy_chuan(cau_hinh, gia_tri, I, C, Q_d, E_wh, P_w, P_max_w))
     nt = _quy_chuan(cau_hinh, gia_tri, I, C, Q_d, E_tp, E_tp * 3600.0 / dt_xa if dt_xa > 0 else float("nan"))
     nc = _quy_chuan(cau_hinh, gia_tri, I, C, Q_d, E_cv2, E_cv2 * 3600.0 / dt_xa if dt_xa > 0 else float("nan"))
     kq.update(Esp_tp=nt["Esp"], Psp_tp=nt["Psp"], Esp_cv2=nc["Esp"], Psp_cv2=nc["Psp"])
@@ -588,12 +610,49 @@ def phan_tich_mau(tt, cau_hinh):
                         j=tv("j"), Csp=tv("Csp"), Qsp=tv("Qsp"), Esp=tv("Esp"), Psp=tv("Psp"), Esp_tp=tv("Esp_tp"), Psp_tp=tv("Psp_tp"),
                         Esp_cv2=tv("Esp_cv2"), Psp_cv2=tv("Psp_cv2"), CE=tv("CE"), EE=tv("EE"),
                         t_nap=tv("t_nap"), t_xa=tv("dt_xa"), T_ck=tv("T_ck"),
-                        ESR=tv("ESR"), dV_IR=tv("dV_IR"), R2=tv("R2"), dang=max(set(dangs), key=dangs.count)))
+                        ESR=tv("ESR"), tau=tv("tau"), Pmax=tv("Pmax"), dV_IR=tv("dV_IR"), R2=tv("R2"), dang=max(set(dangs), key=dangs.count)))
     lech = (float(cau_hinh.get("nernst", 0.059)) * float(cau_hinh.get("ph", 0)) + float(cau_hinh.get("e_ref", 0))) if cau_hinh.get("quy_rhe") else 0.0
     return dict(ten=tt["ten"], path=tt["path"], mau=tt.get("mau") or MAU_DS[0], gia_tri=float(tt["gia_tri"] or 0),
-                chu_ky=chu_ky, nhom=tom, canh_bao=cb + [c for r in chu_ky[:3] for c in r["canh_bao"]][:3],
+                chu_ky=chu_ky, nhom=tom, toc_do=toc_do_tu_nhom(tom), canh_bao=cb + [c for r in chu_ky[:3] for c in r["canh_bao"]][:3],
                 t_tong=float(t[-1] - t[0]) if len(t) > 1 else 0.0, lech_v=lech,
                 _raw=dict(t=t, v=v, v_hien=v + lech, i=i, i_const=d["i_const"]), cot=d["cot"], ten_cot=d["ten_cot"])
+
+
+def toc_do_tu_nhom(nhom):
+    """Khả năng tốc độ: mỗi mức dòng so với mức dòng thấp nhất (%), theo Csp, Qsp và (nếu có) hồi phục khi quay lại dòng thấp.
+    Chỉ có nghĩa khi ≥ 2 mức dòng. Trả list dict theo j tăng dần."""
+    if len(nhom) < 2:
+        return []
+    ds = sorted(nhom, key=lambda g: g["I_A"])
+    g0 = ds[0]
+    out = []
+    for g in ds:
+        def pt(k, g=g):
+            return g[k] / g0[k] * 100.0 if np.isfinite(g[k]) and np.isfinite(g0[k]) and g0[k] != 0 else float("nan")
+        out.append(dict(j=g["j"], I_A=g["I_A"], Csp=g["Csp"], Qsp=g["Qsp"], giu_Csp=pt("Csp"), giu_Qsp=pt("Qsp")))
+    return out
+
+
+def canh_bao_chung(ds_mau, cfg):
+    """Cảnh báo về CÁCH CHỌN thiết lập (không phải về dữ liệu của một mẫu): đối chiếu hướng dẫn GCD."""
+    cb = []
+    dang = [g["dang"] for m in ds_mau for g in m["nhom"]]
+    if cfg["kieu_cell"] == "2dc" and any(x in ("lai", "pin") for x in dang):
+        cb.append("Đang dùng 4C/m (chỉ đúng cho tế bào đối xứng 2 điện cực) nhưng đường xả dạng lai/pin: nếu là siêu tụ lai bất đối xứng, "
+                  "hãy chọn 'Csp cả cell = C/m' hoặc báo dung lượng mAh/g.")
+    if cfg["kieu_cell"] == "3dc":
+        cb.append("Hệ 3 điện cực / một điện cực: Ragone (E–P) và P_max từ dữ liệu này thường bị phóng đại, chỉ có nghĩa khi đo cell 2 điện cực hoàn chỉnh.")
+    if cfg.get("cach_dv") == "gom_ir":
+        cb.append("ΔV đang GỒM IR drop (kiểu file Excel): Csp thấp hơn cách chuẩn (bỏ IR drop). Hướng dẫn khuyến nghị bộ 'Chuẩn' khi báo cáo bài báo; luôn ghi rõ cách đã dùng.")
+    if any(any(r["dang"] != "tụ" for r in m["chu_ky"]) for m in ds_mau) and cfg["cach_c"] == "do_doc":
+        cb.append("Đường xả không tuyến tính mà đang chọn C = I/|dV/dt|: nên dùng tích phân điện tích hoặc 'năng lượng' (C = 2I∫V dt/ΔV²).")
+    for m in ds_mau:
+        if len(m["chu_ky"]) > 2 and cfg["chu_ky_goc"] <= 1 and m["chu_ky"][0]["chu_ky"] == 1:
+            ck = [r["dt_xa"] for r in m["chu_ky"]]
+            if len(ck) >= 3 and max(ck[1:]) > ck[0] * 1.02:
+                cb.append(f"{m['ten']}: thời gian xả tăng sau chu kỳ 1 (hoạt hóa): nên đặt 'Chu kỳ gốc' sau giai đoạn hoạt hóa để retention không vượt 100 %.")
+                break
+    return cb
 
 
 def quyet_dinh_chinh(ds_mau, cau_hinh):
@@ -624,7 +683,7 @@ def chay(ds_tt, cau_hinh):
         except Exception as e:  # noqa: BLE001
             loi.append((tt.get("ten", tt.get("path")), str(e)))
     chinh, ly_do = quyet_dinh_chinh(mau, cfg)
-    return dict(mau=mau, cfg=cfg, chinh=chinh, ly_do=ly_do, loi=loi, don_vi=don_vi_nhan(cfg))
+    return dict(mau=mau, cfg=cfg, chinh=chinh, ly_do=ly_do, loi=loi, don_vi=don_vi_nhan(cfg), canh_bao_chung=canh_bao_chung(mau, cfg))
 
 
 # ====================== CÀI ĐẶT RIÊNG TỪNG ĐỒ THỊ ======================
@@ -856,7 +915,8 @@ def du_lieu_do_thi(kq, cau_hinh_dt=None):
     cach_e = s["cach_e"] or cfg["cach_e"]
     ke, kp = ("Esp_cv2", "Psp_cv2") if cach_e in ("cv2", "cv2_dv") else ("Esp_tp", "Psp_tp")
     ser = [dict(ten=m["ten"], mau=m["mau"], x=[g[kp] for g in m["nhom"]], y=[g[ke] for g in m["nhom"]], truc="y", kieu="ls") for m in kq["mau"] if m["nhom"]]
-    hoan_thien("ragone", dict(tieu_de="Ragone", x_nhan=f"Power density ({u['P']})", y_nhan=f"Energy density ({u['E']})", log_x=True, log_y=True, series=ser), s)
+    hoan_thien("ragone", dict(tieu_de="Ragone", x_nhan=f"Power density ({u['P']})", y_nhan=f"Energy density ({u['E']})", log_x=True, log_y=True, series=ser,
+                           ghi_chu=(["⚠ Hệ 3 điện cực: E–P thường bị phóng đại, chỉ so sánh được khi đo cell 2 điện cực"] if cfg["kieu_cell"] == "3dc" else [])), s)
     # 4) retention + CE ; 5) Csp/Q + CE theo chu kỳ
     for ma in HAI_TRUC:
         s = cai_dat_do_thi(ma, cau_hinh_dt)
@@ -1071,13 +1131,14 @@ def bang_ket_qua(kq, cau_hinh_dt=None):
                                f"Csp ({u['C']})": g["Csp"], f"Qsp ({u['Q']})": g["Qsp"], f"E ({u['E']})": g["Esp"], f"P ({u['P']})": g["Psp"],
                                f"E ½CV² ({u['E']})": g["Esp_cv2"], f"P ½CV² ({u['P']})": g["Psp_cv2"],
                                "t nạp (s)": g["t_nap"], "t xả (s)": g["t_xa"], "Chu kỳ nạp–xả (s)": g["T_ck"],
-                               "CE (%)": g["CE"], "EE (%)": g["EE"], "IR drop (V)": g["dV_IR"], "ESR (Ω)": g["ESR"], "R² tuyến tính": g["R2"], "Dạng đường xả": g["dang"]}))
+                               "CE (%)": g["CE"], "EE (%)": g["EE"], "IR drop (V)": g["dV_IR"], "ESR (Ω)": g["ESR"], "τ = ESR·C (s)": g["tau"],
+                               f"P_max ({u['P']})": g["Pmax"], "R² tuyến tính": g["R2"], "Dạng đường xả": g["dang"]}))
             rag.append(_hang({"Mẫu": m["ten"], f"j ({u['j']})": g["j"], f"P tích phân ({u['P']})": g["Psp_tp"], f"E tích phân ({u['E']})": g["Esp_tp"],
                               f"P ½CV² ({u['P']})": g["Psp_cv2"], f"E ½CV² ({u['E']})": g["Esp_cv2"]}))
         for r in m["chu_ky"]:
             cky.append(_hang({"Mẫu": m["ten"], "Chu kỳ": r["chu_ky"], f"j ({u['j']})": r["j"], "I (mA)": r["I_A"] * 1000,
                               "Bắt đầu (s)": r["t0"], "t nạp (s)": r["t_nap"], "t xả (s)": r["dt_xa"], "Chu kỳ nạp–xả (s)": r["T_ck"], "ΔV dùng (V)": r["dV"],
-                              "V_ext (V)": r["V_ext"], "V cuối (V)": r["V_cuoi"], "IR drop (V)": r["dV_IR"], "ESR (Ω)": r["ESR"],
+                              "V_ext (V)": r["V_ext"], "V cuối (V)": r["V_cuoi"], "IR drop (V)": r["dV_IR"], "ESR (Ω)": r["ESR"], "τ (s)": r["tau"],
                               "C (F, cell)": r["C_F"], f"Csp ({u['C']})": r["Csp"], f"Qsp ({u['Q']})": r["Qsp"], f"E ({u['E']})": r["Esp"], f"P ({u['P']})": r["Psp"],
                               "CE (%)": r["CE"], "EE (%)": r["EE"], "R²": r["R2"], "Dạng": r["dang"]}))
         sr = cai_dat_do_thi("retention", cau_hinh_dt)
@@ -1095,13 +1156,25 @@ def bang_ket_qua(kq, cau_hinh_dt=None):
     return tong, cky, rag, ret, cb
 
 
+def bang_toc_do(kq):
+    """Khả năng tốc độ (rate capability): giữ lại so với mức dòng thấp nhất (%) cho Csp và Qsp."""
+    u = kq["don_vi"]
+    out = []
+    for m in kq["mau"]:
+        for r in m.get("toc_do") or []:
+            out.append(_hang({"Mẫu": m["ten"], f"j ({u['j']})": r["j"], f"Csp ({u['C']})": r["Csp"], f"Qsp ({u['Q']})": r["Qsp"],
+                              "Giữ Csp so với j thấp nhất (%)": r["giu_Csp"], "Giữ Qsp so với j thấp nhất (%)": r["giu_Qsp"]}))
+    return out
+
+
 def cong_thuc_ghi_chu(kq):
     cfg = kq["cfg"]
     he = ("4C/m (tế bào 2 điện cực đối xứng, m = tổng khối lượng: Stoller & Ruoff 2010)" if cfg["kieu_cell"] == "2dc" else
           "C/m, m = tổng khối lượng hai điện cực (điện dung của cả cell)" if cfg["kieu_cell"] == "2dc_cell" else "C/m (một điện cực / ba điện cực)")
     gom = cfg.get("cach_dv") == "gom_ir"
     ce = cfg.get("cach_e", "tich_phan")
-    return [
+    chung = [{"Mục": "⚠ Lưu ý chọn thiết lập", "Nội dung": c} for c in kq.get("canh_bao_chung", [])]
+    return chung + [
         {"Mục": "Đại lượng chính", "Nội dung": ("Điện dung riêng F/g" if kq["chinh"] == "dien_dung" else "Dung lượng riêng mAh/g") + " — " + kq["ly_do"]},
         {"Mục": "Bộ công thức", "Nội dung": "Kiểu file Excel của người dùng (ΔV gồm IR drop, E = ½CΔV²)" if (gom and ce == "cv2_dv") else
                                           "Chuẩn (ΔV loại IR drop, E tích phân)" if (not gom and ce == "tich_phan") else "Tùy chọn riêng (xem từng dòng bên dưới)"},
@@ -1110,7 +1183,10 @@ def cong_thuc_ghi_chu(kq):
                                    if gom else "ΔV = V_ext − V_cuối_xả, V_ext = điện thế ngoại suy về lúc đảo dòng (đã bỏ IR drop; Stoller & Ruoff, BioLogic AN51).")},
         {"Mục": "Điện dung (tích phân)", "Nội dung": "C = Q/ΔV = I·Δt/ΔV (hợp đường cong không tuyến tính)."},
         {"Mục": "Điện dung (độ dốc)", "Nội dung": f"C = I/|dV/dt| trên đoạn từ V_ext (sau IR drop) xuống V_cuối + {cfg['doc_p']:g}·ΔV (Gamry; Stoller & Ruoff: Vmax → ½Vmax)."},
-        {"Mục": "Đang dùng", "Nội dung": "độ dốc" if cfg["cach_c"] == "do_doc" else "tích phân điện tích"},
+        {"Mục": "Điện dung (năng lượng)", "Nội dung": "C = 2·I·∫(V − V_cuối)dt/ΔV², ΔV sau IR drop: dùng cho đường xả phi tuyến (giả tụ, lai); trùng C = Q/ΔV khi đường xả thẳng."},
+        {"Mục": "Đang dùng", "Nội dung": {"do_doc": "độ dốc", "nang_luong": "năng lượng (2I∫V dt/ΔV²)"}.get(cfg["cach_c"], "tích phân điện tích")},
+        {"Mục": "τ, P_max", "Nội dung": "τ = ESR·C_cell (s). P_max = (V_đỉnh − V_cuối)²/(4·ESR) (W), chia khối lượng/diện tích đã nhập. Chỉ tin cậy với cell 2 điện cực có nửa nạp liền trước."},
+        {"Mục": "Khả năng tốc độ", "Nội dung": "Csp (hoặc Qsp) ở mỗi mức dòng / giá trị ở mức dòng thấp nhất × 100 (sheet 'Khả năng tốc độ')."},
         {"Mục": "IR drop, ESR", "Nội dung": "Ngoại suy tuyến tính 5–25% đầu nửa xả về lúc đảo dòng → V_ext; ΔV_IR = V_nạp-cuối − V_ext; ESR = ΔV_IR/(2I) (Gamry: U_loss = ESR·I ở mỗi chiều)."},
         {"Mục": "Điện dung riêng", "Nội dung": "Csp = " + he + "; chuẩn hóa theo " + ("khối lượng (mg nhập vào)" if cfg["chuan"] == "khoi_luong" else "diện tích (cm² nhập vào)") +
                                            ". Khớp file Excel: Csp = I(A)·Δt/(m(g)·ΔV)."},
@@ -1133,8 +1209,10 @@ def xuat_tat_ca(kq, thu_muc, ten="GCD", ds_hinh=None, cau_hinh_dt=None):
     """Excel (+CSV từng đồ thị cho Origin) + JSON mô tả. Trả dict đường dẫn."""
     os.makedirs(thu_muc, exist_ok=True)
     tong, cky, rag, ret, cb = bang_ket_qua(kq, cau_hinh_dt)
+    cb = [{"Mẫu": "(thiết lập)", "Nội dung": c} for c in kq.get("canh_bao_chung", [])] + cb
     sheets = [("Tổng hợp theo dòng", tong or [{"Mẫu": ""}]), ("Từng chu kỳ", cky or [{"Mẫu": ""}]),
               ("Thời gian chu kỳ", bang_thoi_gian(kq) or [{"Mẫu": ""}]),
+              ("Khả năng tốc độ", bang_toc_do(kq) or [{"Mẫu": "(cần ≥ 2 mức dòng)"}]),
               ("Ragone", rag or [{"Mẫu": ""}]), ("Retention", ret or [{"Mẫu": "(không có nhóm dòng ≥ 3 chu kỳ)"}]),
               ("Công thức", cong_thuc_ghi_chu(kq)), ("Cảnh báo", cb or [{"Mẫu": "", "Nội dung": "Không phát hiện vấn đề nào."}])]
     p_x = os.path.join(thu_muc, f"{ten}_ket_qua.xlsx")
@@ -1193,15 +1271,19 @@ def tom_tat(kq):
     for m in kq["mau"]:
         d.append(f"■ {m['ten']}  ({len(m['chu_ky'])} chu kỳ xả; {m['gia_tri']:g} {'mg' if kq['cfg']['chuan'] == 'khoi_luong' else 'cm²'})")
         if m["nhom"]:
-            d.append(f"   {'j ('+u['j']+')':>14} {'n':>4} {'Csp':>9} {'Qsp':>9} {'E':>9} {'P':>10} {'CE %':>7} {'ESR Ω':>8} {'R²':>6}  dạng")
+            d.append(f"   {'j ('+u['j']+')':>14} {'n':>4} {'Csp':>9} {'Qsp':>9} {'E':>9} {'P':>10} {'CE %':>7} {'ESR Ω':>8} {'τ s':>8} {'R²':>6}  dạng")
             for g in m["nhom"]:
                 d.append(f"   {_f(g['j']):>14} {g['so_chu_ky']:>4} {_f(g['Csp']):>9} {_f(g['Qsp']):>9} {_f(g['Esp']):>9} {_f(g['Psp']):>10} "
-                         f"{_f(g['CE'], 4):>7} {_f(g['ESR']):>8} {_f(g['R2'], 3):>6}  {g['dang']}")
+                         f"{_f(g['CE'], 4):>7} {_f(g['ESR']):>8} {_f(g['tau']):>8} {_f(g['R2'], 3):>6}  {g['dang']}")
             ck = m["chu_ky"]
             if ck:
                 tb_ = lambda k: float(np.nanmean([r[k] for r in ck]))  # noqa: E731
                 d.append(f"   Thời gian: đo {m['t_tong']:.6g} s ({m['t_tong'] / 3600:.3g} h) · nạp TB {_f(tb_('t_nap'), 4)} s · xả TB {_f(tb_('dt_xa'), 4)} s"
                          f" · chu kỳ nạp–xả TB {_f(tb_('T_ck'), 4)} s")
+            if m.get("toc_do"):
+                a, b = m["toc_do"][0], m["toc_do"][-1]
+                gk = b["giu_Csp"] if kq["chinh"] == "dien_dung" else b["giu_Qsp"]
+                d.append(f"   Khả năng tốc độ: {_f(gk, 3)} % khi j tăng từ {_f(a['j'])} lên {_f(b['j'])} {u['j']}")
             c = chuoi_retention(m, kq["cfg"], kq["chinh"])
             if c:
                 nh, ds = c
@@ -1211,5 +1293,7 @@ def tom_tat(kq):
         d.append("")
     for ten, e in kq["loi"]:
         d.append(f"✖ {ten}: {e}")
+    for c_ in kq.get("canh_bao_chung", []):
+        d.append("ℹ " + c_)
     d.append(f"Đơn vị: Csp {u['C']} · Qsp {u['Q']} · E {u['E']} · P {u['P']}")
     return "\n".join(d)

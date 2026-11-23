@@ -586,3 +586,60 @@ Khi tick **Xuất báo cáo Excel**, file `bao_cao_tong_hop.xlsx` ngoài các b�
 - ECSA: các điểm đã có ở sheet "ECSA - điểm"; Cdl nhiều mẫu có file riêng `Cdl_nhieu_diem.csv`.
 - Chưa có số liệu điểm cho Tafel của công cụ Qs-LSV trong báo cáo (công cụ đó tự ghi CSV/JSON riêng).
 - Không muốn các sheet này: thêm tham số dòng lệnh `--khong-so-lieu-ve`.
+
+## v102 - Báo cáo Excel: dữ liệu thô + dữ liệu xử lý bằng công thức
+
+Thay cho các sheet "Vẽ ..." của v101 (chỉ chứa giá trị), báo cáo nay có bộ sheet **kiểm chứng được**:
+
+- **Thông số xử lý:** pH, Eref, k (Nernst), bật/tắt quy đổi RHE, hệ số nhân/chia dòng, Rs, % bù iR. Ô nền vàng sửa được; các công thức dùng tên (pH_dd, E_ref, R_s...) nên dễ đọc.
+- **Thô CV / LSV / TAFEL / IT / EIS (và Thô ECSA_CV):** số liệu gốc từ file (E, i, T, chu kỳ) đúng như đo, mỗi mẫu một cụm cột.
+- **Xử lý CV / LSV / TAFEL / IT / EIS và ECSA_CV_DaTocDo:** bố cục như worksheet Origin (hàng Long Name, Units, Comments, F(x)=). Mỗi ô là công thức, ví dụ `E_RHE = E_thô + RHE_bat×(k_Nernst×pH_dd+E_ref) − i_thô×R_s×iR_pct/100`, `J = i_thô×1000×I_nhan/I_chia`. CV chỉ lấy đúng chu kỳ dùng để vẽ. Kèm biểu đồ dựng sẵn.
+- **Tafel (công thức) + Tafel hệ số (công thức):** Log(J) = LOG10(|J|); hệ số b = SLOPE×1000, a = INTERCEPT, R² = RSQ trên đúng các điểm app đã chọn; có cột "b app tính" và "Chênh lệch" (≈ 0) để đối chiếu.
+- **ECSA (công thức):** ΔJ = (Ja−Jc)/2, Cdl = SLOPE(ΔJ, v), R² = RSQ, ECSA = Cdl/Cs, có dòng đối chiếu với Cdl app tính. (Ja, Jc là giá trị nội suy tại E lấy dòng do app tính, ghi dạng số.)
+
+Đã kiểm tra: mở bằng LibreOffice (tự tính lại công thức) và so với giá trị app: LSV (có quy đổi RHE + bù iR), IT, EIS, hệ số Tafel và Cdl đều trùng (chênh lệch ≤ 1e-9). Không muốn các sheet này: `--khong-so-lieu-ve`. Nếu máy không có openpyxl, báo cáo xuất CSV với số liệu dạng giá trị.
+
+
+## v103 - Công cụ Siêu tụ lai & Pin theo hướng dẫn GCD
+
+Cập nhật tab ① và phần tính toán để khớp hướng dẫn xử lý GCD:
+
+- **Gợi ý theo vật liệu:** chọn "Tụ lớp kép", "Giả tụ", "Siêu tụ lai" hoặc "Pin" để app tự đặt Loại tế bào, Đại lượng chính, Bộ công thức "Chuẩn" và Cách tính C. Chỉnh lại được từng ô sau đó. (Siêu tụ lai: cell 2 điện cực C/m, báo mAh/g.)
+- **Cách tính C thứ ba:** "Năng lượng" C = 2·I·∫(V − V_cuối)dt/ΔV² cho đường xả phi tuyến; trùng cách tích phân điện tích khi đường xả thẳng.
+- **Thêm τ = ESR·C và P_max = (V_đỉnh − V_cuối)²/(4·ESR)** vào bảng "Tổng hợp theo dòng" và "Từng chu kỳ" (P_max chia theo khối lượng/diện tích đã nhập).
+- **Sheet "Khả năng tốc độ":** Csp, Qsp và % giữ lại so với mức dòng thấp nhất; cũng có một dòng trong bảng kết quả của tab ①.
+- **Nút "⚖ Cân bằng khối lượng m₊/m₋...":** m₊/m₋ = (C₋·ΔV₋)/(C₊·ΔV₊) từ Csp và ΔV của từng điện cực đo hệ 3 điện cực.
+- **Cảnh báo chọn thiết lập** (hiện ở tab Kết quả, tab "Công thức & lưu ý", sheet "Cảnh báo"): dùng 4C/m nhưng đường xả dạng lai/pin; hệ 3 điện cực mà vẽ Ragone/P_max; ΔV đang gồm IR drop; dùng độ dốc cho đường không tuyến tính; thời gian xả tăng sau chu kỳ 1 (nên đặt chu kỳ gốc sau hoạt hóa). Ragone có thêm ghi chú trên hình khi là hệ 3 điện cực.
+- Mặc định **không đổi** (vẫn là bộ công thức kiểu file Excel của bạn) để số liệu cũ không lệch.
+
+
+## v104 - AURON: trợ lý hỏi đáp & trợ giúp ngay trong app
+
+Bấm **🤖 Hỏi AURON** (đầu cửa sổ app, hoặc tab Trợ giúp) để mở trợ lý hologram trong **cửa sổ riêng của app**, không mở trình duyệt hay trang web.
+
+- **Tra cứu ngay, không cần AI:** AURON đọc hướng dẫn theo phép đo của app (LSV, Tafel, ECSA, EIS, GCD, XPS, XRD...) và trả lời cách làm, công thức, tiêu chí, lỗi thường gặp; hỏi "bản mới có gì?" thì nêu các phiên bản mới nhất. Câu ngoài phạm vi thì nói thẳng là chưa có hướng dẫn.
+- **Bộ não (tùy chọn):** bấm "Kích hoạt bộ não" để chạy mô hình Qwen ngay trên máy (cần WebGPU). Lần đầu tải 0,4–2 GB, sau đó tự bật lại và chạy offline. Mô hình được đưa đúng đoạn hướng dẫn liên quan và được dặn chỉ trả lời theo đó.
+- **Hỏi số liệu của file đã nạp** (điện thế tại 10 mA, Tafel, ECSA...) vẫn dùng tab **Hỏi đáp** của app; AURON chỉ sang tab đó.
+- **Yêu cầu:** thư viện `pywebview` (`python -m pip install pywebview`; build.bat đã gồm) và Microsoft Edge WebView2 (Windows 10/11 thường có sẵn). Thiếu thì app báo rõ cách sửa.
+- Thư viện three.js và WebLLM đã đóng gói trong thư mục `auron_web`, không tải từ internet; chỉ lần tải mô hình đầu tiên cần mạng. Tự cập nhật nay cũng cập nhật thư mục này.
+
+
+## v105 - AURON nhận xét dữ liệu + giao diện gọn hơn
+
+- **Nhận xét sau khi xử lý xong:** khi bấm CHẠY (phân tích hoặc vẽ) xong, hoặc khi công cụ ⚡ Siêu tụ lai & Pin bấm Phân tích xong, AURON hiện nhận xét ngay trong khung trả lời (nếu cửa sổ AURON đang mở; chưa mở thì app báo trong nhật ký và AURON hiện nhận xét gần nhất trong 30 phút khi bạn mở). Nhận xét do quy tắc trong code tạo từ chính số liệu app tính (không phải mô hình đoán), gồm:
+  - CV/LSV: mẫu tốt nhất theo quá thế (hoặc điện thế) tại mật độ dòng mục tiêu, chênh lệch với mẫu kế tiếp, xếp hạng, độ dốc Tafel; cảnh báo khi chênh lệch < 10 mV, η bất thường, Tafel ngoài 20–300 mV/dec, xếp hạng η và Tafel không trùng.
+  - IT (độ bền): % giữ dòng, tốc độ suy giảm, nhắc khi đo dưới 10 h.
+  - EIS: Rs và R_tong−Rs của từng mẫu, mẫu có điện trở chuyển điện tích thấp nhất.
+  - GCD: đại lượng báo cáo, dạng đường xả, CE, ESR, retention, khả năng tốc độ và các lưu ý về thiết lập (4C/m, hệ 3 điện cực, ΔV gồm IR).
+  - Các ngưỡng ghi "tham khảo" là kiến thức chung, không phải ngưỡng bắt buộc. Số cảnh báo `[CẢNH BÁO]` của lần chạy cũng được tóm tắt.
+  - Hỏi "giải thích kết quả vừa rồi": khi chưa bật bộ não, AURON nhắc lại nhận xét; khi đã bật, mô hình dùng nhận xét làm ngữ cảnh để giải thích thêm (chỉ dùng số liệu có trong đó).
+  - (v106) Thêm nhận xét cho XPS, XRD, HR-TEM, ECSA tương tác, Tafel Qs-LSV (xem mục v106 bên dưới).
+- **Giao diện AURON:** bảng biểu cảm đã ẩn, biểu cảm tự đổi theo nội dung trả lời (lúc rảnh chỉ đổi nhẹ, không nói); khung trả lời rộng, cao, có lịch sử cuộn; bảng điều khiển là một ô nhỏ bên trái, kéo thanh trên cùng để di chuyển, bấm ◂/▸ để thu gọn hoặc mở, nhớ vị trí lần sau.
+
+## v106 - AURON nhận xét thêm XPS, XRD, HR-TEM, ECSA tương tác, Tafel Qs-LSV
+- **XPS:** sau ▶ Fit, AURON nêu số thành phần, Residual STD (so khoảng 0,85–1,15), tự tương quan phần dư, từng thành phần (BE, FWHM, % diện tích, có chạm biên ràng buộc không), dịch hiệu chuẩn (nhắc kiểm tra nếu > 1 eV) và các lưu ý của công cụ.
+- **XRD:** sau Phân tích, nêu pha xác định (mức chắc chắn, số vạch khớp), hằng số mạng so với chuẩn (lệch > 0,5 % thì nhắc), kích thước tinh thể Scherrer (không phải kích thước hạt), vạch thiếu, số đỉnh chưa gán, và đỉnh MỚI/mất khi so với mẫu chuẩn.
+- **HR-TEM:** khi tìm đốm FFT: d của từng đốm, pha khớp, nhắc "nhiều pha cùng khớp thì d một mình không phân biệt được"; khi Thêm phép đo: độ lệch d so với d chuẩn (> 3 % thì nhắc), số vân quá ít, kết quả kiểm chứng ImageJ.
+- **ECSA tương tác:** khi bấm Dùng: Cdl, R², số tốc độ quét, ECSA = Cdl/Cs, cảnh báo Cdl ≤ 0, R² thấp, ít điểm, giao điểm trục tung lớn.
+- **Tafel Qs-LSV:** khi Xuất / Lưu kết quả / Vẽ Origin: b ± sai số, R², số điểm, số decade (< 1 thì nhắc), mẫu có b nhỏ nhất, cảnh báo của công cụ.
+- Ngưỡng ghi "tham khảo" là kiến thức chung, không bắt buộc. Cùng một nhận xét lặp lại liên tiếp chỉ hiện một lần. Lỗi khi nhận xét không bao giờ làm hỏng công cụ.
