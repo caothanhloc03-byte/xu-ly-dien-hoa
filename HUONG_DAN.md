@@ -675,3 +675,9 @@ Bấm **🤖 Hỏi AURON** (đầu cửa sổ app, hoặc tab Trợ giúp) để
 ## v112 - XPS: xem trước kiểu Casa
 - Hình trong cửa sổ XPS sau khi fit giờ vẽ kiểu CasaXPS (dữ liệu thô đỏ, nền nâu, thành phần cộng nền, đường bao xám, phần dư phía trên + Residual STD, thanh tiêu đề xanh).
 - Bỏ tích ô **Xem trước kiểu Casa** để quay về hình cũ (thành phần tô màu + khung phần dư riêng).
+
+## v113 - XPS xuất Casa khớp hình xem trước
+- Sửa các chỗ làm Casa dựng lại khác app: vị trí đỉnh ghi làm tròn 0.01 eV (nay 5 chữ số thập phân); vùng Casa làm rơi điểm đầu/cuối (nay mở rộng 1/4 bước); nền Shirley của app lấy trung bình 3 điểm đầu (nay 2 điểm, như Casa); diện tích quy ra chiều cao nay tính trong vùng như app.
+- Sau mỗi lần xuất, app **đọc ngược** file `_casa_fit.vms` bằng mô hình Casa và so với hình xem trước; kết quả ghi ở thanh trạng thái và cuối file `_casa_thanh_phan.txt` (KHỚP / CÓ LỆCH).
+- **Xuất sang Casa** giờ mở thẳng `_casa_fit.vms` (chỉ khối C1s đã fit, không phải chọn khối). File `_casa_goc.vms` (nguyên file gốc, fit nằm ở khối C1s) và `_casa.vms` (các đường Raw/Background/Envelope/thành phần/Residual đúng số của app, để Display > Overlay) vẫn được ghi.
+- Chưa kiểm chứng trên CasaXPS thật: phần kiểm tra dùng mô hình Casa của app.

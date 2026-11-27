@@ -16,6 +16,7 @@ import numpy as np
 
 DW_FWHM = 0.2                      # chênh FWHM tối đa giữa các thành phần cùng họ (eV); tài liệu: ±10% hoặc ±0.1 eV
 F_TOI_HAN = 4.0                    # ngưỡng F (thêm 3 tham số, p < 0.01, bậc tự do ~100)
+N_TB_CASA = 2                      # số điểm lấy trung bình ở mỗi đầu nền Shirley: 2 như đã đối chiếu với CasaXPS (để Casa dựng lại đúng nền của app)
 HE_SO_GL = 30.0                    # GL(30): 70% Gauss, 30% Lorentz (dạng tích) như CasaXPS
 LN2_4 = 4.0 * math.log(2.0)
 
@@ -396,7 +397,7 @@ def tougaard(be, y, n_tb=3, C=1643.0, so_diem=None):
 def nen_theo(ten, be, y):
     t = str(ten).lower()
     if t.startswith("shirley"):
-        return shirley(be, y)
+        return shirley(be, y, n_tb=N_TB_CASA)
     if t.startswith("tougaard"):
         return tougaard(be, y)
     return tuyen_tinh(be, y)
@@ -1061,7 +1062,7 @@ def kq_tu_casa(khoi, t_thu, dich_chuan=284.8, ten_ref="C-C", m=HE_SO_GL, n_tb=2)
     cac, thanh, tp = [], [], []
     for c in cs["thanh_phan"]:
         w, vt = c["fwhm"], c["vt_be"] + dich
-        cao = c["dien_tich"] / max(float(np.sum(gl(xx, 0, w, m)) * 0.002), 1e-12)
+        cao = c["dien_tich"] / max(float(_trapz(gl(b, vt, w, m), b)), 1e-12)       # diện tích Casa tính trong VÙNG (như app), không phải cả đường cong vô hạn
         cac.append(cao * gl(b, vt, w, m))
         thanh.append({"ten": c["ten"], "vt": vt, "fwhm": w, "cao": cao, "dt": c["dien_tich"], "tach": 0.0, "ti_le": 0.0, "la": None, "o_bien": []})
         tp.append(ThanhPhan(c["ten"], vt, vt - 0.3, vt + 0.3, w, max(w - 0.3, 0.2), w + 0.3, "số từ Casa"))
@@ -1861,7 +1862,9 @@ def casa_chu_thich(kq, ten, hv, dich=0.0):
     Tougaard (tham số riêng của Casa) ghi nền 'None'. Đỉnh bất đối xứng LA được ghi dạng GL(30)."""
     f = kq["fit"]
     b = np.asarray(kq["be"], float) - dich                       # dich != 0: về thang BE gốc của file (chưa hiệu chuẩn)
-    e1, e2 = hv - float(b.max()), hv - float(b.min())
+    buoc = float(np.median(np.abs(np.diff(np.sort(b))))) if len(b) > 1 else 0.0
+    mo_rong = 0.25 * buoc                                        # mở vùng ra 1/4 bước: làm tròn 5 chữ số không được làm rơi điểm đầu/cuối (đổi Shirley)
+    e1, e2 = hv - float(b.max()) - mo_rong, hv - float(b.min()) + mo_rong
     nen = str(kq.get("tham_so_fit", {}).get("nen", "shirley")).lower()
     ten_nen = "Shirley" if "shirley" in nen else ("Linear" if ("tuy" in nen or "linear" in nen) else "None")
     nhan = re.sub(r"[()*]", "", ten)
@@ -1876,8 +1879,8 @@ def casa_chu_thich(kq, ten, hv, dich=0.0):
         for nm, be_c, ar in parts:
             ke = hv - be_c
             w = c["fwhm"]
-            cs.append(f"CASA comp (*{nm}*) (*GL(30)*) Area {max(ar, 0.0):.6g} 4 10000000 -1 1 MFWHM {w:.6g} {0.3 * w:.6g} {4 * w:.6g} -1 1 "
-                      f"Position {ke:.6g} {ke - 1.0:.6g} {ke + 1.0:.6g} -1 1 RSF 1 MASS 0 (*NoTag*)")
+            cs.append(f"CASA comp (*{nm}*) (*GL(30)*) Area {max(ar, 0.0):.8g} 4 10000000 -1 1 MFWHM {w:.6g} {0.3 * w:.6g} {4 * w:.6g} -1 1 "
+                      f"Position {ke:.5f} {ke - 1.0:.5f} {ke + 1.0:.5f} -1 1 RSF 1 MASS 0 (*NoTag*)")
     return ["Casa Info Follows", "0", "0", "1"] + L + [str(len(cs))] + cs + ["Echem Studio: thanh phan da fit"]
 
 
@@ -1953,9 +1956,35 @@ def xuat_casa(kq, thu_muc, ten="XPS", hv=1486.6, dwell_scan=None):
     L += ["", f"File *_casa_fit.vms: một khối phổ thô kèm vùng nền và {len(f['thanh_phan'])} thành phần ở dạng Casa tự hiểu (CASA region / CASA comp), "
           "khi mở Casa tự dựng đường bao và các thành phần ngay trên phổ. Nền Tougaard ghi 'None'; đỉnh LA ghi dạng GL(30); "
           "Casa tính lại hình đỉnh theo định nghĩa của nó nên diện tích có thể lệch nhẹ so với app."]
+    kt = kiem_tra_casa(kq, pf, (dwell_scan or 1.0))
+    L += ["", "TỰ KIỂM TRA SAU KHI GHI: " + kt["ghi"] + ("  -> KHỚP hình xem trước." if kt["ok"] else "  -> CÓ LỆCH, hãy báo lại.")]
     with open(pt, "w", encoding="utf-8") as fh:
         fh.write("\n".join(L) + "\n")
+    xuat_casa.kiem_tra = kt
     return [pv, pt, pf]
+
+
+def kiem_tra_casa(kq, duong_fit_vms, t_thu=1.0, n_tb=2):
+    """Đọc NGƯỢC file *_casa_fit.vms đã ghi (như Casa sẽ đọc: vùng, nền Shirley, thành phần GL(30)), dựng lại đường bao bằng mô hình Casa của app
+    và so với đường bao trong hình xem trước. Trả về dict(ok, lech_max_pct, lech_vt_max_eV, so_diem_app, so_diem_casa, ghi)."""
+    try:
+        bl = doc_xps(duong_fit_vms)[0]
+        k2 = kq_tu_casa(bl, t_thu, dich_chuan=None, n_tb=n_tb)
+        if not k2:
+            return {"ok": False, "ghi": "file không có fit Casa để đọc ngược"}
+        o1, o2 = np.argsort(kq["be"]), np.argsort(k2["be"])
+        b1, b2 = np.asarray(kq["be"], float)[o1], np.asarray(k2["be"], float)[o2]
+        e1 = (np.asarray(kq["nen"], float) + np.asarray(kq["fit"]["mo_hinh"], float))[o1]
+        e2 = (np.asarray(k2["nen"], float) + np.asarray(k2["fit"]["mo_hinh"], float))[o2]
+        e2i = np.interp(b1, b2, e2)
+        cao = max(float(np.ptp(np.asarray(kq["y"], float))), 1.0)
+        lech = float(np.max(np.abs(e1 - e2i)) / cao * 100.0)
+        dvt = max((abs(a["vt"] - c["vt"]) for a, c in zip(kq["fit"]["thanh_phan"], k2["fit"]["thanh_phan"])), default=0.0)
+        ok = len(b1) == len(b2) and lech < 0.5 and dvt < 0.01
+        return {"ok": ok, "lech_max_pct": lech, "lech_vt_max_eV": float(dvt), "so_diem_app": len(b1), "so_diem_casa": len(b2),
+                "ghi": f"Đọc ngược file Casa: {len(b2)}/{len(b1)} điểm, đường bao lệch tối đa {lech:.3f}% biên độ phổ, vị trí đỉnh lệch tối đa {dvt:.4f} eV."}
+    except Exception as e:                                     # noqa: BLE001
+        return {"ok": False, "ghi": f"không đọc ngược được file Casa: {e}"}
 
 
 def duong_an_toan_casa(vms):

@@ -129,3 +129,16 @@ class TestXemTruocCasa(unittest.TestCase):
         ax = fig.add_subplot(111)
         xps.ve_kieu_casa_len_truc(ax, kq, "")
         self.assertGreaterEqual(len(ax.lines), 5)
+
+
+class TestXuatCasaKhopXemTruoc(unittest.TestCase):
+    def test_doc_nguoc_file_casa_khop(self):
+        import tempfile
+        be, y = pho(True)
+        kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
+        with tempfile.TemporaryDirectory() as d:
+            xps.xuat_casa(kq, d, "C1s", 1486.6, 1.0)
+            kt = xps.xuat_casa.kiem_tra
+            self.assertTrue(kt["ok"], kt["ghi"])
+            self.assertLess(kt["lech_max_pct"], 0.05)
+            self.assertEqual(kt["so_diem_app"], kt["so_diem_casa"])

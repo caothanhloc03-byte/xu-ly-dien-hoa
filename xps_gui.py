@@ -505,8 +505,10 @@ class CuaSoXps:
             return
         ten = (self.v_ten.get().strip() or "XPS").replace(" ", "_")
         kq = self._ghi_casa(d, ten)
-        self.v_tt.set("Đã ghi file CasaXPS: " + ", ".join(os.path.basename(x) for x in kq))
-        self._mo_casa(kq[-1])
+        kt = getattr(xps.xuat_casa, "kiem_tra", None) or {}
+        self.v_tt.set("Đã ghi file CasaXPS: " + ", ".join(os.path.basename(x) for x in kq) + ("  |  " + kt["ghi"] if kt.get("ghi") else ""))
+        fit_vms = next((x for x in kq if x.endswith("_casa_fit.vms")), kq[-1])      # khối duy nhất đã có fit: mở thẳng, không phải chọn khối
+        self._mo_casa(fit_vms)
 
     def _mo_casa(self, vms):
         """Mở file .vms bằng CasaXPS. Tìm exe tự động; không thấy thì hỏi chọn CasaXPS.exe một lần (nhớ cho lần sau); cuối cùng thử
