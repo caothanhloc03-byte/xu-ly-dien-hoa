@@ -113,7 +113,7 @@ class CuaSoXps:
         self._nut(f4, "💾 Xuất", self.xuat, "Xuất CSV + hình").pack(side="left", padx=3)
         mc = self._menu(f4, "◧ Casa ▾", "Các thao tác với CasaXPS")
         for t, c in (("Xuất sang CasaXPS...", self.xuat_casa), ("Nhận kết quả từ Casa...", self.nhan_tu_casa), ("Nhận kết quả + bảng số Casa (.txt)...", self.nhan_tu_casa_kem_bang), ("Vẽ Origin từ file Casa...", self.ve_origin_tu_casa),
-                     ("So với Casa...", self.so_voi_casa)):
+                     ("So với Casa...", self.so_voi_casa), ("Lưu hình kiểu Casa...", self.luu_hinh_casa)):
             mc.add_command(label=t, command=c)
         mt = self._menu(f4, "🛠 Công cụ ▾", "Chọn vùng bằng chuột, màu, dịch, RSF, lưu/nạp mô hình")
         for t, c in (("Kéo chuột chọn vùng fit", lambda: self.chon_chuot("fit")), ("Kéo chuột chọn khoảng dò đỉnh", lambda: self.chon_chuot("do")),
@@ -342,6 +342,22 @@ class CuaSoXps:
         self.v_tt.set("Fit xong. Kiểm tra từng thành phần có hợp lý hoá học không (mục Nhận xét) trước khi xuất.")
 
     # ---------- xuất ----------
+    def luu_hinh_casa(self):
+        if not self.kq:
+            messagebox.showinfo("Hình kiểu Casa", "Hãy fit trước.")
+            return
+        ten = (self.v_ten.get().strip() or "XPS").replace(" ", "_")
+        p = filedialog.asksaveasfilename(defaultextension=".png", initialfile=f"{ten}_kieu_Casa.png",
+                                         filetypes=[("PNG", "*.png"), ("PDF", "*.pdf")])
+        if not p:
+            return
+        try:
+            xps.ve_kieu_casa(self.kq, p, self.v_mau.get() or ten)
+        except Exception as e:
+            messagebox.showerror("Hình kiểu Casa", str(e))
+            return
+        messagebox.showinfo("Hình kiểu Casa", f"Đã lưu:\n{p}")
+
     def _xuat_file(self, thu_muc):
         ten = (self.v_ten.get().strip() or "XPS").replace(" ", "_")
         os.makedirs(thu_muc, exist_ok=True)
@@ -352,6 +368,9 @@ class CuaSoXps:
             p = os.path.join(thu_muc, f"{ten}_hinh.{ext}")
             xps.ve_hinh(self.kq, p, ten, 300, kieu=self.kieu)
             kq.append(p)
+        pcs = os.path.join(thu_muc, f"{ten}_kieu_Casa.png")
+        xps.ve_kieu_casa(self.kq, pcs, self.v_mau.get() or ten, 200)
+        kq.append(pcs)
         n = len(self.kq["fit"]["thanh_phan"])
         kieu = xps.chuan_kieu(self.kieu, n)
         pk = os.path.join(thu_muc, f"{ten}_kieu.json")

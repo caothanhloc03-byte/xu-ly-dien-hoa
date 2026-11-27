@@ -98,3 +98,13 @@ class TestNoiLongCasa(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHinhKieuCasa(unittest.TestCase):
+    def test_ve_png(self):
+        import tempfile
+        be, y = pho(True)
+        kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
+        with tempfile.TemporaryDirectory() as d:
+            p = xps.ve_kieu_casa(kq, os.path.join(d, "c.png"), "C1s", 80)
+            self.assertTrue(os.path.getsize(p) > 5000)

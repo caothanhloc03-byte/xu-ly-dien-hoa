@@ -662,3 +662,8 @@ Bấm **🤖 Hỏi AURON** (đầu cửa sổ app, hoặc tab Trợ giúp) để
 - **Cách làm mới:** nếu bảng thành phần là mặc định mà Residual STD > 2, app thử thêm mô hình nới ràng buộc kiểu Casa: FWHM tối đa 3 eV, cửa sổ C-C 284,0–285,2 eV, vùng fit lùi tới chỗ phổ trở về nền phẳng, hiệu chuẩn theo đỉnh cao nhất (như Casa) và không ghim lại C-C về 284,8. Mô hình này chỉ được dùng khi Residual STD giảm ít nhất 20 %, và có ghi rõ trong "Quyết định về thành phần" cùng nhận xét của AURON.
 - Trên file CoCe_100h.vms: vùng fit 279,0–290,4 eV, thành phần chính 284,41 eV, FWHM 3,0 eV (Casa: 284,39 eV, FWHM tối đa 3), Residual STD 8,1 → ~1,0. Thang Residual STD của app (sai số Poisson theo dwell×scan) khác thang Casa nên không so trực tiếp với 2,152.
 - Bảng thành phần do người dùng tự sửa luôn được tôn trọng (không tự nới). Phổ rộng như vậy thường do tích điện/nhiều trạng thái chồng; đừng diễn giải hóa học chi tiết từng thành phần.
+
+## v110 - XPS: hình kiểu CasaXPS
+- Menu **◧ Casa ▾ → Lưu hình kiểu Casa...** vẽ hình giống CasaXPS từ chính kết quả fit của app: nền Shirley (nâu), từng thành phần cộng nền, đường bao xám, dữ liệu thô đỏ (cả vùng ngoài vùng fit), phần dư phía trên kèm *Residual STD*, thanh tiêu đề xanh, trục CPS x 10^-2.
+- **💾 Xuất** cũng lưu thêm `<tên>_kieu_Casa.png`.
+- Lưu ý: *Residual STD* của app tính theo định nghĩa riêng (dựa nhiễu Poisson) nên số có thể khác số CasaXPS hiển thị.

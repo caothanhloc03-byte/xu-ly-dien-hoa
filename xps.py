@@ -2008,3 +2008,65 @@ def tim_casa_exe():
                         if f.lower() in ("casaxps.exe", "casa.exe"):
                             return os.path.join(r, f)
     return None
+
+
+MAU_KIEU_CASA = ["#a8474b", "#8db04a", "#4a7ebd", "#d08a2e", "#8a5aa8", "#2aa198", "#c2557a", "#6b8e23"]
+
+
+def ve_kieu_casa(kq, duong=None, ten="", dpi=150, cho_xem=False):
+    """Vẽ hình theo phong cách CasaXPS: nền Shirley (nâu), từng thành phần cộng nền, đường bao xám,
+    dữ liệu thô đỏ, phần dư nằm phía trên trên một đường 0 màu đen kèm 'Residual STD', thanh tiêu đề xanh,
+    trục CPS x 10^-2. Dùng đúng kết quả fit của ứng dụng (không tính lại)."""
+    import matplotlib
+    if not cho_xem:
+        matplotlib.use("Agg")
+    from matplotlib.figure import Figure
+    from matplotlib.patches import Rectangle
+    f = kq["fit"]
+    be, nen = np.asarray(kq["be"], float), np.asarray(kq["nen"], float)
+    bd = np.asarray(kq.get("be_day_du", kq["be"]), float)
+    yd = np.asarray(kq.get("y_day_du", kq["y"]), float)
+    x, cac, bao = duong_cong(kq)
+    nx = np.interp(x, be[np.argsort(be)], nen[np.argsort(be)])
+    S = 1e-2
+    pd_ = np.asarray(f["phan_du"], float)
+    cao = max(float(np.max(yd)), float(np.max(bao + nx)))
+    thap = min(float(np.min(yd)), float(np.min(nen)))
+    kc = max(cao - thap, 1.0)
+    amp = max(float(np.max(np.abs(pd_))), kc * 0.02)
+    y0 = cao + 0.10 * kc + amp          # đường 0 của phần dư
+    y_tren = y0 + 0.9 * amp + 0.06 * kc
+    y_duoi = thap - 0.08 * kc
+    fig = Figure(figsize=(9.6, 6.6), dpi=dpi)
+    fig.patch.set_facecolor("#dfe3f2")
+    ax = fig.add_axes([0.095, 0.14, 0.86, 0.76])
+    ax.set_facecolor("white")
+    ax.plot(bd, yd * S, color="#e0201c", lw=1.4, zorder=3)
+    ax.plot(x, nx * S, color="#7a4a14", lw=1.4, zorder=2)
+    for i, c in enumerate(cac):
+        ax.plot(x, (c + nx) * S, color=MAU_KIEU_CASA[i % len(MAU_KIEU_CASA)], lw=1.3, zorder=2)
+    ax.plot(x, (bao + nx) * S, color="#8f8f8f", lw=1.6, zorder=2)
+    ax.plot(be, (y0 + pd_) * S, color="#7a4a14", lw=1.3, zorder=2)
+    ax.axhline(y0 * S, color="k", lw=1.4, zorder=4)
+    ax.text(0.03, (y0 - 0.07 * kc) * S, f"Residual STD = {f['rstd']:.3f}", fontsize=15, fontweight="bold",
+            va="center", transform=ax.get_yaxis_transform())
+    for i, c in enumerate(f["thanh_phan"]):
+        j = int(np.argmax(cac[i]))
+        ax.text(x[j], (cac[i][j] + nx[j] + 0.03 * kc) * S, c["ten"], color=MAU_KIEU_CASA[i % len(MAU_KIEU_CASA)],
+                fontsize=13, fontweight="bold", ha="center", va="bottom")
+    lo, hi = float(min(bd.min(), be.min())), float(max(bd.max(), be.max()))
+    ax.set_xlim(hi + 0.04 * (hi - lo), lo - 0.04 * (hi - lo))
+    ax.set_ylim(y_duoi * S, y_tren * S)
+    ax.tick_params(labelsize=14, width=1.2, length=6)
+    for l in ax.get_xticklabels() + ax.get_yticklabels():
+        l.set_fontweight("bold")
+    ax.set_xlabel("binding energy (eV)", fontsize=16, fontweight="bold")
+    ax.set_ylabel("CPS x 10$^{-2}$", fontsize=16, fontweight="bold")
+    for s in ax.spines.values():
+        s.set_linewidth(1.6)
+    fig.add_artist(Rectangle((0.095, 0.90), 0.86, 0.045, transform=fig.transFigure, facecolor="#2f6ac4", edgecolor="none"))
+    fig.text(0.525, 0.9225, ten or "XPS", color="white", fontsize=16, fontweight="bold", ha="center", va="center")
+    if duong:
+        fig.savefig(duong, facecolor=fig.get_facecolor())
+        return duong
+    return fig
