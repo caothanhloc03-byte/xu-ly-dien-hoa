@@ -865,6 +865,13 @@ def _tp_nho_casa(tp):
     return ra
 
 
+def _tp_kieu_casa():
+    """Bộ 3 đỉnh rộng như người dùng CasaXPS hay dựng cho C1s rộng: C-C ~284.4 (FWHM ~3), đỉnh hẹp ~285.7, đỉnh rộng ~287 (FWHM ~3)."""
+    return [ThanhPhan("C-C / C=C / C-H", 284.4, 284.0, 285.2, 3.0, 2.7, 3.0, "đỉnh chính (kiểu Casa, không ép về 284.8)"),
+            ThanhPhan("C-O / C-N", 285.7, 285.3, 286.1, 1.8, 1.0, 2.0, "đỉnh hẹp xen giữa"),
+            ThanhPhan("C=O / O-C-O", 286.9, 286.4, 287.5, 3.0, 2.7, 3.0, "đỉnh rộng BE cao")]
+
+
 def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0), dich_chuan=284.8, khoang_do=(290.0, 280.0),
                   nen="shirley", t_thu=None, m=HE_SO_GL, tu_chon=True, tp_chuan_theo="C-C", dw_fwhm=DW_FWHM, dich_san=None, tu_chinh=True, rstd_dich=1.0,
                   cat_thung_lung=True, nho_casa=True):
@@ -882,12 +889,19 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
         lo_m = lo_nen_phang(be_s + d1, y_s, float(vung[0]))
         ung = _pho_goc(be, y, mau, _tp_nho_casa(macdinh), [], (lo_m, vung[1]), dich_chuan, khoang_do, nen, t_thu, m, False, None, max(dw_fwhm, 1.5), d1,
                        False, rstd_dich, cat_thung_lung)
+        try:                                           # bộ đỉnh kiểu Casa (3 đỉnh rộng): dùng nếu đường bao gần như không xấu đi
+            uc = _pho_goc(be, y, mau, _tp_kieu_casa(), [], (lo_m, vung[1]), dich_chuan, khoang_do, nen, t_thu, m, False, None, max(dw_fwhm, 1.5), d1,
+                          False, rstd_dich, cat_thung_lung)
+            if uc["fit"]["rstd"] <= 1.25 * ung["fit"]["rstd"]:
+                ung = uc
+        except (ValueError, ArithmeticError):
+            pass
     except (ValueError, ArithmeticError):
         return kq
     if ung["fit"]["rstd"] < 0.8 * kq["fit"]["rstd"]:
         r0, r1 = kq["fit"]["rstd"], ung["fit"]["rstd"]
         ung["ghi"] = [f"Mô hình chuẩn không mô tả được phổ này (Residual STD {r0:.2f}; thành phần chạm biên FWHM/vị trí): dùng mô hình nới ràng buộc kiểu CasaXPS "
-                      f"(FWHM tối đa 3 eV, cửa sổ C-C 284.0-285.2 eV, vùng fit {ung['tham_so_fit']['vung'][0]:.1f}-{ung['tham_so_fit']['vung'][1]:.1f} eV, "
+                      f"(đỉnh rộng FWHM tới 3 eV, cửa sổ C-C 284.0-285.2 eV, vùng fit {ung['tham_so_fit']['vung'][0]:.1f}-{ung['tham_so_fit']['vung'][1]:.1f} eV, "
                       f"hiệu chuẩn theo đỉnh cao nhất {d1:+.2f} eV, không ghim lại C-C về 284.8) -> Residual STD {r1:.2f}. "
                       f"Phổ rộng như vậy thường do tích điện/nhiều trạng thái chồng; hãy so với CasaXPS và đừng diễn giải hóa học chi tiết."] + list(ung.get("ghi", []))
         return ung

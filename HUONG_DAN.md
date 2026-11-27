@@ -667,3 +667,7 @@ Bấm **🤖 Hỏi AURON** (đầu cửa sổ app, hoặc tab Trợ giúp) để
 - Menu **◧ Casa ▾ → Lưu hình kiểu Casa...** vẽ hình giống CasaXPS từ chính kết quả fit của app: nền Shirley (nâu), từng thành phần cộng nền, đường bao xám, dữ liệu thô đỏ (cả vùng ngoài vùng fit), phần dư phía trên kèm *Residual STD*, thanh tiêu đề xanh, trục CPS x 10^-2.
 - **💾 Xuất** cũng lưu thêm `<tên>_kieu_Casa.png`.
 - Lưu ý: *Residual STD* của app tính theo định nghĩa riêng (dựa nhiễu Poisson) nên số có thể khác số CasaXPS hiển thị.
+
+## v111 - XPS C1s rộng: đỉnh giống Casa
+- Khi phổ C1s rộng (mô hình chuẩn không mô tả nổi), app thử thêm bộ 3 đỉnh kiểu Casa: C-C 284.0-285.2 (FWHM ~3), đỉnh hẹp 285.3-286.1, đỉnh rộng 286.4-287.5 (FWHM ~3). Dùng bộ này nếu Residual STD không tệ hơn quá 25% so với mô hình nới lỏng thường.
+- Với CoCe_100h: 284.45 / 285.73 / 287.43 eV (Casa: 284.39 / 285.70 / 286.93), đường bao vẫn khớp dữ liệu (STD 1.11). Đỉnh thứ ba lệch ~0.5 eV vì dữ liệu + nền Shirley của app ưa vị trí đó.

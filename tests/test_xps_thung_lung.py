@@ -108,3 +108,13 @@ class TestHinhKieuCasa(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = xps.ve_kieu_casa(kq, os.path.join(d, "c.png"), "C1s", 80)
             self.assertTrue(os.path.getsize(p) > 5000)
+
+
+class TestBoDinhKieuCasa(unittest.TestCase):
+    def test_bang_kieu_casa_va_ket_qua(self):
+        tp = xps._tp_kieu_casa()
+        self.assertEqual([(round(c.vt_lo, 1), round(c.vt_hi, 1)) for c in tp], [(284.0, 285.2), (285.3, 286.1), (286.4, 287.5)])
+        be, y = pho_rong()
+        kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
+        self.assertEqual(len(kq["fit"]["thanh_phan"]), 3)
+        self.assertLess(kq["fit"]["rstd"], 1.6)
