@@ -671,3 +671,7 @@ Bấm **🤖 Hỏi AURON** (đầu cửa sổ app, hoặc tab Trợ giúp) để
 ## v111 - XPS C1s rộng: đỉnh giống Casa
 - Khi phổ C1s rộng (mô hình chuẩn không mô tả nổi), app thử thêm bộ 3 đỉnh kiểu Casa: C-C 284.0-285.2 (FWHM ~3), đỉnh hẹp 285.3-286.1, đỉnh rộng 286.4-287.5 (FWHM ~3). Dùng bộ này nếu Residual STD không tệ hơn quá 25% so với mô hình nới lỏng thường.
 - Với CoCe_100h: 284.45 / 285.73 / 287.43 eV (Casa: 284.39 / 285.70 / 286.93), đường bao vẫn khớp dữ liệu (STD 1.11). Đỉnh thứ ba lệch ~0.5 eV vì dữ liệu + nền Shirley của app ưa vị trí đó.
+
+## v112 - XPS: xem trước kiểu Casa
+- Hình trong cửa sổ XPS sau khi fit giờ vẽ kiểu CasaXPS (dữ liệu thô đỏ, nền nâu, thành phần cộng nền, đường bao xám, phần dư phía trên + Residual STD, thanh tiêu đề xanh).
+- Bỏ tích ô **Xem trước kiểu Casa** để quay về hình cũ (thành phần tô màu + khung phần dư riêng).

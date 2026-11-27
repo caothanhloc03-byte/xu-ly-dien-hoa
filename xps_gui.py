@@ -46,6 +46,8 @@ class CuaSoXps:
         self.v_mau = tk.StringVar(value="C1s")
         self.v_tu_chon = tk.BooleanVar(value=True)
         self.v_casa = tk.BooleanVar(value=True)
+        self.v_xem_casa = tk.BooleanVar(value=True)
+        self._khung_casa = []
         self.v_tom_tat = tk.StringVar(value="")
         self.v_giu_be_casa = tk.BooleanVar(value=True)
         self.v_tt = tk.StringVar(value="Mở file .vms (CasaXPS) hoặc file text/Excel xuất từ CasaXPS.")
@@ -122,6 +124,7 @@ class CuaSoXps:
                      ("Lưu mô hình...", self.luu_mo_hinh), ("Nạp mô hình...", self.nap_mo_hinh)):
             mt.add_separator() if t is None else mt.add_command(label=t, command=c)
         ttk.Checkbutton(f4, text="Origin kèm Casa", variable=self.v_casa).pack(side="left", padx=8)
+        ttk.Checkbutton(f4, text="Xem trước kiểu Casa", variable=self.v_xem_casa, command=self._ve_lai).pack(side="left", padx=4)
         ttk.Checkbutton(f4, text="Giữ BE đúng như Casa (không ép C-C về chuẩn)", variable=self.v_giu_be_casa).pack(side="left", padx=4)
 
         than = ttk.PanedWindow(w, orient="horizontal")
@@ -304,11 +307,46 @@ class CuaSoXps:
         except Exception:  # noqa: BLE001
             pass
 
+    def _bo_cuc(self, casa, ten=""):
+        """Đổi bố cục khung hình: kiểu Casa (một trục + thanh tiêu đề) hoặc kiểu cũ (trục chính + khung phần dư)."""
+        for a in self._khung_casa:
+            try:
+                a.remove()
+            except Exception:
+                pass
+        self._khung_casa = []
+        if casa:
+            vt = (0.16, 0.14, 0.81, 0.74)
+            self.ax.set_position(vt)
+            self.ax_r.set_visible(False)
+            self._khung_casa = xps.ve_kieu_casa_khung(self.fig, ten, vt)
+        else:
+            self.fig.patch.set_facecolor("white")
+            gs = self.fig.add_gridspec(4, 1, hspace=0.12)
+            self.ax.set_position(gs[:3, 0].get_position(self.fig))
+            self.ax_r.set_position(gs[3, 0].get_position(self.fig))
+            self.ax_r.set_visible(True)
+
+    def _ve_lai(self):
+        if getattr(self, "kq", None):
+            self.hien_ket_qua()
+
     def hien_ket_qua(self):
         kq = self.kq
         f = kq["fit"]
         self.ax.clear()
         self.ax_r.clear()
+        if self.v_xem_casa.get():
+            self._bo_cuc(True, self.v_mau.get() or "XPS")
+            try:
+                xps.ve_kieu_casa_len_truc(self.ax, kq, "")
+            except Exception:
+                self._bo_cuc(False)
+                self.v_xem_casa.set(False)
+            self.cv.draw_idle()
+            self._ghi_ket_qua(kq, f)
+            return
+        self._bo_cuc(False)
         b = kq["be"]
         o = np.argsort(b)
         self.ax.plot(b[o], kq["ys"][o], ".", ms=2.5, color="#888", zorder=1)
@@ -321,6 +359,9 @@ class CuaSoXps:
         self.ax_r.set_xlabel("Binding Energy (eV)")
         self.ax_r.set_ylabel("Phần dư", fontsize=8)
         self.cv.draw_idle()
+        self._ghi_ket_qua(kq, f)
+
+    def _ghi_ket_qua(self, kq, f):
         dong = [f"Dịch hiệu chuẩn: {kq['dich_hieu_chuan']:+.3f} eV" + (f" (C-C về {self._so(self.v_chuan, 'chuẩn'):.2f} eV)" if self.cuoi_ts.get("dich_san") is None else " (dịch đã biết)"),
                 f"Residual STD = {f['rstd']:.2f}   (tự tương quan phần dư {f['tu_tuong_quan']:+.2f})", "",
                 f"{'Thành phần':<20}{'BE (eV)':>9}{'FWHM':>7}{'Diện tích':>11}{'%':>7}"]
@@ -744,6 +785,7 @@ class CuaSoXps:
         v = self.vung[getattr(self, "chon", 0)]
         self.ax.clear()
         self.ax_r.clear()
+        self._bo_cuc(False)
         o = np.argsort(v["be"])
         self.ax.plot(v["be"][o], v["y"][o], ".-", ms=3, lw=0.6, color="#444")
         lo, hi = float(v["be"].min()), float(v["be"].max())

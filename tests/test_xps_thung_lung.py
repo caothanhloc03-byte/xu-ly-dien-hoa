@@ -118,3 +118,14 @@ class TestBoDinhKieuCasa(unittest.TestCase):
         kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
         self.assertEqual(len(kq["fit"]["thanh_phan"]), 3)
         self.assertLess(kq["fit"]["rstd"], 1.6)
+
+
+class TestXemTruocCasa(unittest.TestCase):
+    def test_ve_len_truc_co_san(self):
+        from matplotlib.figure import Figure
+        be, y = pho(True)
+        kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
+        fig = Figure()
+        ax = fig.add_subplot(111)
+        xps.ve_kieu_casa_len_truc(ax, kq, "")
+        self.assertGreaterEqual(len(ax.lines), 5)
