@@ -309,7 +309,7 @@ def tu_xps(kq, mau="", ten=""):
     for c in sorted(tp, key=lambda c: -c["pct"]):
         dong.append(f"• {c['ten']}: {c['vt']:.2f} eV, FWHM {c['fwhm']:.2f} eV, {c['pct']:.1f} % diện tích" + (" (chạm biên ràng buộc)" if c["o_bien"] else ""))
     for g in kq.get("ghi", []):
-        if g.startswith("Có đỉnh phụ"):
+        if g.startswith(("Có đỉnh phụ", "Mô hình chuẩn không mô tả")):
             dong.append("Vùng fit: " + _cat(g, 260))
     dich = kq.get("dich_hieu_chuan")
     if dich is not None and math.isfinite(dich):

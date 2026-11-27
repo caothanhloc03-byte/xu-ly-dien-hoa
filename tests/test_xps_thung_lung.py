@@ -55,5 +55,46 @@ class TestThungLung(unittest.TestCase):
         self.assertEqual(xps.cat_vung_thung_lung(be, y, (281.5, 291.0)), (None, None))
 
 
+def pho_rong(seed=1):
+    """C1s rộng (FWHM ~2,8 eV, đỉnh chính ~284,5) như mẫu CoCe: mô hình chuẩn (FWHM <= 1,6) không mô tả nổi."""
+    rng = np.random.default_rng(seed)
+    be = np.arange(275.1, 295.1, 0.125)
+
+    def pk(x0, w, A):
+        g = xps.gl(be, x0, w)
+        return A * g / g.max()
+    y = pk(284.5, 2.8, 4300) + pk(286.4, 2.4, 1100) + pk(288.0, 2.0, 500) + 4450 + rng.normal(0, 40, len(be))
+    y = y + np.where(be > 290.5, 1400 * np.exp(-((be - 292.4) / 1.4) ** 2), 0.0)
+    return be, y
+
+
+class TestNoiLongCasa(unittest.TestCase):
+    def test_pho_rong_dung_mo_hinh_noi_long(self):
+        be, y = pho_rong()
+        chuan = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False, nho_casa=False)
+        kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
+        self.assertGreater(chuan["fit"]["rstd"], 2.0)
+        self.assertLess(kq["fit"]["rstd"], 0.8 * chuan["fit"]["rstd"])
+        self.assertTrue(any(g.startswith("Mô hình chuẩn không mô tả") for g in kq["ghi"]))
+        main = max(kq["fit"]["thanh_phan"], key=lambda c: c["pct"])
+        self.assertTrue(284.0 <= main["vt"] <= 285.0, main["vt"])
+        self.assertGreater(main["fwhm"], 2.3)
+        self.assertLess(kq["tham_so_fit"]["vung"][0], 281.5)       # vùng fit lùi tới nền phẳng
+        self.assertTrue(289.5 < kq["tham_so_fit"]["vung"][1] < 291.0)
+
+    def test_pho_hep_khong_bi_noi_long(self):
+        for seed in (1, 2):
+            be, y = pho(False, seed)
+            kq = xps.phan_tich_pho(be, y, "C1s", tu_chinh=False)
+            self.assertFalse(any(g.startswith("Mô hình chuẩn không mô tả") for g in kq["ghi"]))
+
+    def test_bang_thanh_phan_tu_sua_duoc_ton_trong(self):
+        be, y = pho_rong()
+        tp = [xps.ThanhPhan(**c.dict()) for c in xps.MAU["C1s"][0]]
+        tp[0].w_hi = 1.7
+        kq = xps.phan_tich_pho(be, y, "C1s", tp=tp, tu_chinh=False)
+        self.assertFalse(any(g.startswith("Mô hình chuẩn không mô tả") for g in kq["ghi"]))
+
+
 if __name__ == "__main__":
     unittest.main()

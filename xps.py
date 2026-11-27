@@ -730,14 +730,14 @@ def cat_vung_thung_lung(be, y, vung, so_diem_min=20):
                     f"(thay vì {hi:g} eV) và đặt nền Shirley neo ở đó để nền không bị nâng lên bởi sườn đỉnh phụ; đỉnh phụ nằm ngoài vùng fit.")
 
 
-def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0), dich_chuan=284.8, khoang_do=(290.0, 280.0),
+def _pho_goc(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0), dich_chuan=284.8, khoang_do=(290.0, 280.0),
                   nen="shirley", t_thu=None, m=HE_SO_GL, tu_chon=True, tp_chuan_theo="C-C", dw_fwhm=DW_FWHM, dich_san=None, tu_chinh=True, rstd_dich=1.0, cat_thung_lung=True):
     """Hiệu chuẩn -> cắt vùng -> nền -> fit -> (tuỳ chọn) thêm thành phần ứng viên có kiểm định -> hiệu chuẩn lại theo thành phần C-C.
     Trả về dict kết quả (energies đã hiệu chuẩn)."""
     be, y = _sap_xep(be, y)
     if tu_chinh and t_thu:
         # bước 1: fit thường (đã nới cửa sổ vị trí/FWHM nếu cần); bước 2: nếu Residual STD vẫn xa đích, thử vài biên vùng fit
-        kq0 = phan_tich_pho(be, y, mau, tp, ung_vien, vung, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san,
+        kq0 = _pho_goc(be, y, mau, tp, ung_vien, vung, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san,
                             tu_chinh=False, rstd_dich=rstd_dich, cat_thung_lung=cat_thung_lung)
         _tu_chinh_cua_so(kq0, m, t_thu, dw_fwhm, rstd_dich, tp_chuan_theo)
         if kq0["fit"]["rstd"] <= rstd_dich + 0.08:
@@ -748,7 +748,7 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
                 if (lo, hi) == tuple(vung) or lo > 282.0 or hi - lo < 8.0:
                     continue
                 try:
-                    k = phan_tich_pho(be, y, mau, tp, ung_vien, (lo, hi), dich_chuan, khoang_do, nen, t_thu, m, False, tp_chuan_theo, dw_fwhm,
+                    k = _pho_goc(be, y, mau, tp, ung_vien, (lo, hi), dich_chuan, khoang_do, nen, t_thu, m, False, tp_chuan_theo, dw_fwhm,
                                       dich_san, tu_chinh=False, rstd_dich=rstd_dich, cat_thung_lung=cat_thung_lung)
                 except ValueError:
                     continue
@@ -756,7 +756,7 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
                     tot = k
         if tot is not kq0:
             vg = tot["tham_so_fit"]["vung"]
-            tot = phan_tich_pho(be, y, mau, tp, ung_vien, vg, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san,
+            tot = _pho_goc(be, y, mau, tp, ung_vien, vg, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san,
                                 tu_chinh=False, rstd_dich=rstd_dich, cat_thung_lung=cat_thung_lung)
             _tu_chinh_cua_so(tot, m, t_thu, dw_fwhm, rstd_dich, tp_chuan_theo)
             tot["ghi"] = list(tot.get("ghi", [])) + [f"Tự chỉnh vùng fit {tuple(vung)} -> ({tot['tham_so_fit']['vung'][0]:g}, {tot['tham_so_fit']['vung'][1]:g}) eV: "
@@ -831,6 +831,67 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
     ket_qua["tham_so_fit"] = {"t_thu": t_thu, "m": m, "nen": nen, "dw": dw_fwhm, "vung": tuple(vung), "ung_vien": uv_goc}
     ket_qua["canh_bao"] = danh_gia(ket_qua)
     return ket_qua
+
+
+def lo_nen_phang(be, y, lo_hien_tai):
+    """Đầu năng lượng thấp của vùng fit cho phổ rộng: lùi tới chỗ phổ trở về nền phẳng (nền Shirley cần neo ở nền phẳng; cắt giữa đuôi đỉnh chính
+    làm nền bị nâng). be đã hiệu chuẩn, tăng dần. Trả giá trị mới (<= lo_hien_tai) hoặc lo_hien_tai."""
+    be, y = np.asarray(be, float), np.asarray(y, float)
+    ys = _lam_tron(y, 5)
+    ip = int(np.argmax(np.where((be >= lo_hien_tai) & (be <= lo_hien_tai + 12.0), ys, -np.inf)))
+    day = be <= be.min() + 2.0
+    if day.sum() < 5 or ip < 5:
+        return lo_hien_tai
+    nen, nhieu = float(np.median(y[day])), float(np.std(y[day]))
+    cao = float(ys[ip] - nen)
+    if cao <= 0:
+        return lo_hien_tai
+    nguong = nen + max(0.02 * cao, 3.0 * nhieu)
+    k = ip
+    while k > 0 and ys[k] > nguong:
+        k -= 1
+    return float(min(lo_hien_tai, max(be.min() + 0.3, be[k] - 1.0)))
+
+
+def _tp_nho_casa(tp):
+    """Nới ràng buộc như CasaXPS cho phổ C1s rộng: FWHM tối đa 3 eV, cửa sổ vị trí của thành phần C-C 284.0-285.2 eV."""
+    ra = []
+    for c in tp:
+        d = ThanhPhan(**c.dict())
+        d.w_hi = max(d.w_hi, 3.0)
+        if "C-C" in d.ten:
+            d.vt_lo, d.vt_hi = min(d.vt_lo, 284.0), max(d.vt_hi, 285.2)
+        ra.append(d)
+    return ra
+
+
+def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0), dich_chuan=284.8, khoang_do=(290.0, 280.0),
+                  nen="shirley", t_thu=None, m=HE_SO_GL, tu_chon=True, tp_chuan_theo="C-C", dw_fwhm=DW_FWHM, dich_san=None, tu_chinh=True, rstd_dich=1.0,
+                  cat_thung_lung=True, nho_casa=True):
+    """Như _pho_goc; thêm: nếu C1s với bảng thành phần mặc định mà fit chuẩn rất xấu (Residual STD > 2), thử mô hình nới ràng buộc kiểu CasaXPS
+    (FWHM tới 3 eV, cửa sổ C-C 284.0-285.2 eV, vùng fit lùi tới nền phẳng, hiệu chuẩn theo đỉnh cao nhất như Casa) và dùng nếu tốt hơn rõ rệt."""
+    kq = _pho_goc(be, y, mau, tp, ung_vien, vung, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san, tu_chinh, rstd_dich, cat_thung_lung)
+    if not (nho_casa and mau == "C1s") or kq["fit"]["rstd"] <= 2.0:
+        return kq
+    macdinh = MAU["C1s"][0]
+    if tp is not None and [(c.ten, c.vt_lo, c.vt_hi, c.w_lo, c.w_hi) for c in tp] != [(c.ten, c.vt_lo, c.vt_hi, c.w_lo, c.w_hi) for c in macdinh]:
+        return kq                                      # người dùng đã tự sửa bảng thành phần: tôn trọng
+    try:
+        be_s, y_s = _sap_xep(be, y)
+        d1 = float(dich_san) if dich_san is not None else hieu_chuan(be_s, y_s, dich_chuan, khoang_do)[0]
+        lo_m = lo_nen_phang(be_s + d1, y_s, float(vung[0]))
+        ung = _pho_goc(be, y, mau, _tp_nho_casa(macdinh), [], (lo_m, vung[1]), dich_chuan, khoang_do, nen, t_thu, m, False, None, max(dw_fwhm, 1.5), d1,
+                       False, rstd_dich, cat_thung_lung)
+    except (ValueError, ArithmeticError):
+        return kq
+    if ung["fit"]["rstd"] < 0.8 * kq["fit"]["rstd"]:
+        r0, r1 = kq["fit"]["rstd"], ung["fit"]["rstd"]
+        ung["ghi"] = [f"Mô hình chuẩn không mô tả được phổ này (Residual STD {r0:.2f}; thành phần chạm biên FWHM/vị trí): dùng mô hình nới ràng buộc kiểu CasaXPS "
+                      f"(FWHM tối đa 3 eV, cửa sổ C-C 284.0-285.2 eV, vùng fit {ung['tham_so_fit']['vung'][0]:.1f}-{ung['tham_so_fit']['vung'][1]:.1f} eV, "
+                      f"hiệu chuẩn theo đỉnh cao nhất {d1:+.2f} eV, không ghim lại C-C về 284.8) -> Residual STD {r1:.2f}. "
+                      f"Phổ rộng như vậy thường do tích điện/nhiều trạng thái chồng; hãy so với CasaXPS và đừng diễn giải hóa học chi tiết."] + list(ung.get("ghi", []))
+        return ung
+    return kq
 
 
 def _tu_chinh_cua_so(kq, m, t_thu, dw, rstd_dich, ref_ten, dung_sai=0.08):
