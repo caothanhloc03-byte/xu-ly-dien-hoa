@@ -426,7 +426,7 @@ TOPICS = [
          tieu_chi=["Cảnh báo tự động: E sau quy đổi ngoài −1.5…3.5 V vs RHE; dòng > 5000 hoặc < 10⁻⁴ mA/cm²."], loi=["Nhập Eref của điện cực khác loại (Ag/AgCl vs Hg/HgO...)."],
          ket_qua=["Sheet 'Thông tin' ghi thông số đã dùng."], xem_them=["lsv", "bu ir"], thuc_te=lambda c: _thuc_te_quy_doi(c)),
     dict(id="auron", ten="AURON: trợ lý hỏi đáp & trợ giúp (hologram)", loai_app=None,
-         bi_danh=["auron", "tro ly", "hologram", "hoi dap tro giup", "chatbot", "ai", "bo nao", "qwen", "webgpu"],
+         bi_danh=["auron", "thu muc lam viec", "chay toan bo data", "chay ca thu muc", "tro ly", "hologram", "hoi dap tro giup", "chatbot", "ai", "bo nao", "qwen", "webgpu"],
          tom_tat="AURON là trợ lý hologram trong cửa sổ riêng của app, trả lời cách làm, công thức, tiêu chí và lỗi thường gặp của từng phép đo. "
                  "Hỏi tra cứu chạy ngay không cần AI; bật 'bộ não' (mô hình Qwen chạy ngay trên máy) để trả lời tự nhiên hơn, dựa trên đúng hướng dẫn của app. "
                  "Sau khi app phân tích/vẽ xong (CV, LSV, IT, EIS) hoặc công cụ Siêu tụ lai & Pin phân tích xong, AURON tự nhận xét số liệu trong khung trả lời.",
@@ -435,6 +435,7 @@ TOPICS = [
                "Muốn trả lời tự do: bấm 'Kích hoạt bộ não', chọn Qwen 0.5B/1.5B/3B, chờ tải xong (một lần). Các lần sau AURON tự bật lại và chạy offline.",
                "Hỏi số liệu của chính các file đã nạp (điện thế tại 10 mA, Tafel, ECSA...) thì dùng tab Hỏi đáp của app.",
                "Sau khi bấm CHẠY xong (hoặc Phân tích trong công cụ ⚡), mở/nhìn cửa sổ AURON: nhận xét hiện ở khung trả lời (xếp hạng mẫu, Tafel, độ bền IT, EIS, GCD kèm lưu ý). Hỏi 'giải thích kết quả vừa rồi' để nghe thêm.",
+               "Làm việc trong một thư mục: bấm ô '📁 Chọn thư mục làm việc' (hoặc gõ: mở thư mục D:\\Du_lieu). AURON nhận diện từng thư mục con theo tên (CV, LSV, IT, EIS, ECSA, Tafel, GCD, XPS, XRD, HR-TEM) và đối chiếu với nội dung file, rồi liệt kê để ngài xem. Gõ 'chạy toàn bộ data' hoặc 'chỉ chạy EIS và GCD' hoặc 'chạy thư mục EIS_1'; AURON chạy, vẽ, nhận xét lần lượt từng bài, báo tiến độ, gõ 'dừng' để hủy. Kết quả lưu trong thư mục con Ket_qua_AURON, dữ liệu gốc không bị sửa. CV/LSV/IT/EIS/ECSA/Tafel dùng đúng thông số đang đặt ở cửa sổ chính (pH, Eref, diện tích, bù iR, Origin); GCD/XPS/XRD dùng thiết lập mặc định; HR-TEM cần chọn vùng ảnh nên chỉ được liệt kê.",
                "Bảng điều khiển nhỏ bên trái: kéo thanh trên cùng để di chuyển, bấm ◂ để thu gọn sang trái. Biểu cảm của AURON tự thay đổi theo nội dung."],
          phep_tinh=[], tieu_chi=["Mô hình nhỏ có thể sai; AURON được yêu cầu chỉ trả lời theo tài liệu của app và nói thẳng khi chưa có hướng dẫn. Kiểm tra lại số liệu quan trọng."],
          loi=["Báo thiếu pywebview: chạy  python -m pip install pywebview  (bản exe cần build lại bằng build.bat).", "Không bật được bộ não: máy/WebView2 chưa hỗ trợ WebGPU; AURON vẫn tra cứu hướng dẫn bình thường.",

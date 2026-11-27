@@ -692,15 +692,53 @@ def _o_bien(p, i, gh, dung_sai=0.05):
 
 
 # ====================== QUY TRÌNH HOÀN CHỈNH ======================
+def cat_vung_thung_lung(be, y, vung, so_diem_min=20):
+    """Phổ C1s hay có đỉnh phụ ở năng lượng cao (π–π*, cacbonat...) nằm sát đầu vùng fit: nếu giữ nguyên, điểm neo của nền Shirley rơi lên sườn
+    đỉnh phụ và nền bị nâng lên (cùng lý do Casa đặt vùng kết thúc ở đáy 'thung lũng'). Hàm tìm thung lũng giữa đỉnh chính và đỉnh phụ; nếu nó nằm
+    trong vùng fit thì trả (hi_moi, mô_tả), ngược lại (None, None). be: đã hiệu chuẩn, tăng dần."""
+    be, y = np.asarray(be, float), np.asarray(y, float)
+    lo, hi = float(vung[0]), float(vung[1])
+    mk = (be >= lo) & (be <= hi + 4.0)
+    if mk.sum() < 40:
+        return None, None
+    b, v = be[mk], _lam_tron(y[mk], 7)
+    ch = (b <= hi)
+    ip = int(np.argmax(np.where(ch, v, -np.inf)))                  # đỉnh chính
+    # thung lũng = cực tiểu cục bộ đầu tiên (từ 4,3 eV trên đỉnh chính để qua khỏi các thành phần C-O, C=O, O-C=O) mà sau đó phổ còn nhô lên một đỉnh phụ thật sự
+    dx = float(np.median(np.diff(b))) or 0.1
+    w = max(2, int(round(0.5 / dx)))
+    im = ib = None
+    for i in range(ip + 1, len(b) - w):
+        if b[i] < b[ip] + 4.3:
+            continue
+        if v[i] > np.min(v[max(0, i - w):i + w + 1]) + 1e-12:     # chưa phải cực tiểu cục bộ
+            continue
+        sau = np.where((b > b[i] + 0.8) & (b <= b[i] + 4.0))[0]
+        if len(sau) < 3:
+            continue
+        j = int(sau[np.argmax(v[sau])])
+        chieu_cao = float(v[ip] - v[i])
+        if chieu_cao > 0 and float(v[j] - v[i]) >= 0.04 * chieu_cao:   # đỉnh phụ cao hơn đáy >= 4% chiều cao đỉnh chính
+            im, ib = i, j
+            break
+    if im is None:
+        return None, None
+    hi_moi = float(b[im])
+    if hi_moi >= hi - 0.05 or hi_moi - lo < 6.0:
+        return None, None
+    return hi_moi, (f"Có đỉnh phụ ở ~{b[ib]:.1f} eV (π–π*/cacbonat...) sát đầu vùng fit: cắt vùng fit tại đáy thung lũng {hi_moi:.2f} eV "
+                    f"(thay vì {hi:g} eV) và đặt nền Shirley neo ở đó để nền không bị nâng lên bởi sườn đỉnh phụ; đỉnh phụ nằm ngoài vùng fit.")
+
+
 def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0), dich_chuan=284.8, khoang_do=(290.0, 280.0),
-                  nen="shirley", t_thu=None, m=HE_SO_GL, tu_chon=True, tp_chuan_theo="C-C", dw_fwhm=DW_FWHM, dich_san=None, tu_chinh=True, rstd_dich=1.0):
+                  nen="shirley", t_thu=None, m=HE_SO_GL, tu_chon=True, tp_chuan_theo="C-C", dw_fwhm=DW_FWHM, dich_san=None, tu_chinh=True, rstd_dich=1.0, cat_thung_lung=True):
     """Hiệu chuẩn -> cắt vùng -> nền -> fit -> (tuỳ chọn) thêm thành phần ứng viên có kiểm định -> hiệu chuẩn lại theo thành phần C-C.
     Trả về dict kết quả (energies đã hiệu chuẩn)."""
     be, y = _sap_xep(be, y)
     if tu_chinh and t_thu:
         # bước 1: fit thường (đã nới cửa sổ vị trí/FWHM nếu cần); bước 2: nếu Residual STD vẫn xa đích, thử vài biên vùng fit
         kq0 = phan_tich_pho(be, y, mau, tp, ung_vien, vung, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san,
-                            tu_chinh=False, rstd_dich=rstd_dich)
+                            tu_chinh=False, rstd_dich=rstd_dich, cat_thung_lung=cat_thung_lung)
         _tu_chinh_cua_so(kq0, m, t_thu, dw_fwhm, rstd_dich, tp_chuan_theo)
         if kq0["fit"]["rstd"] <= rstd_dich + 0.08:
             return kq0
@@ -711,7 +749,7 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
                     continue
                 try:
                     k = phan_tich_pho(be, y, mau, tp, ung_vien, (lo, hi), dich_chuan, khoang_do, nen, t_thu, m, False, tp_chuan_theo, dw_fwhm,
-                                      dich_san, tu_chinh=False, rstd_dich=rstd_dich)
+                                      dich_san, tu_chinh=False, rstd_dich=rstd_dich, cat_thung_lung=cat_thung_lung)
                 except ValueError:
                     continue
                 if abs(k["fit"]["rstd"] - rstd_dich) < abs(tot["fit"]["rstd"] - rstd_dich) - 1e-3 and not any(c["o_bien"] for c in k["fit"]["thanh_phan"]):
@@ -719,7 +757,7 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
         if tot is not kq0:
             vg = tot["tham_so_fit"]["vung"]
             tot = phan_tich_pho(be, y, mau, tp, ung_vien, vg, dich_chuan, khoang_do, nen, t_thu, m, tu_chon, tp_chuan_theo, dw_fwhm, dich_san,
-                                tu_chinh=False, rstd_dich=rstd_dich)
+                                tu_chinh=False, rstd_dich=rstd_dich, cat_thung_lung=cat_thung_lung)
             _tu_chinh_cua_so(tot, m, t_thu, dw_fwhm, rstd_dich, tp_chuan_theo)
             tot["ghi"] = list(tot.get("ghi", [])) + [f"Tự chỉnh vùng fit {tuple(vung)} -> ({tot['tham_so_fit']['vung'][0]:g}, {tot['tham_so_fit']['vung'][1]:g}) eV: "
                                                       f"Residual STD {kq0['fit']['rstd']:.2f} -> {tot['fit']['rstd']:.2f} (đích ~{rstd_dich:g}); không thêm đỉnh."]
@@ -738,6 +776,12 @@ def phan_tich_pho(be, y, mau="C1s", tp=None, ung_vien=None, vung=(281.5, 291.0),
     ket_qua = None
     ghi_tong = []
     for vong in range(2):
+        if cat_thung_lung and mau in ("C1s", "Ru3d+C1s"):
+            hi_c, ghi_c = cat_vung_thung_lung(be1, y, vung)
+            if hi_c is not None:
+                vung = (vung[0], hi_c)
+                if ghi_c not in ghi_tong:
+                    ghi_tong = ghi_tong + [ghi_c]
         mk = (be1 >= vung[0]) & (be1 <= vung[1])
         if mk.sum() < 20:
             raise ValueError("Vùng fit quá hẹp hoặc nằm ngoài dữ liệu.")

@@ -854,6 +854,14 @@ class App:
         self.dung_giao_dien()
         self.cap_nhat_trang_thai()
         self.doc_hang_doi()
+        self.auron_loi = ""
+        self.dk_auron = None
+        try:                                   # AURON làm việc trong thư mục (nhận lệnh từ cửa sổ AURON)
+            import auron_dieu_khien as adk
+            self.dk_auron = adk.DieuKhien(self, LOAI)
+            self.dk_auron.bat_dau()
+        except Exception as e:  # noqa: BLE001
+            self.q.put(f"(AURON chưa dùng được chế độ thư mục làm việc: {e})\n")
         if cn:
             self.root.after(1500, lambda: self.kiem_tra_cap_nhat(im_lang=True))
 
@@ -1469,7 +1477,7 @@ class App:
                 messagebox.showinfo("Thông báo", "Không tìm thấy file .txt/.csv/.dat mới trong thư mục này.")
 
     MODULE_CAN = ("xu_ly_dien_hoa", "ve_origin", "so_sanh", "cong_cu", "hoi_dap", "canh_bao", "bao_cao", "bao_cao_cong_thuc", "nop_bai", "nop_bai_gui", "doi_chieu", "hinh_tap_chi", "hinh_tap_chi_gui", "hieu_suat", "fit_eis", "hinh_bai_bao",
-                  "pho_xy", "ecsa_tuong_tac", "tof_cv", "qs_lsv", "nhan_dang_nhanh", "loi_than_thien", "mau_du_lieu", "tu_dong_cap_nhat", "hrtem", "hrtem_gui", "ij_nhung", "xps", "xps_gui", "ve_xps_origin", "xrd", "xrd_ngan_hang", "xrd_gui", "ve_xrd_origin", "gcd_pin", "gcd_pin_gui", "ve_gcd_origin", "huong_dan_phep_do", "huong_dan_gui", "dien_cuc_so_sanh", "auron_cua_so", "auron_danh_gia")
+                  "pho_xy", "ecsa_tuong_tac", "tof_cv", "qs_lsv", "nhan_dang_nhanh", "loi_than_thien", "mau_du_lieu", "tu_dong_cap_nhat", "hrtem", "hrtem_gui", "ij_nhung", "xps", "xps_gui", "ve_xps_origin", "xrd", "xrd_ngan_hang", "xrd_gui", "ve_xrd_origin", "gcd_pin", "gcd_pin_gui", "ve_gcd_origin", "huong_dan_phep_do", "huong_dan_gui", "dien_cuc_so_sanh", "auron_cua_so", "auron_danh_gia", "auron_thu_muc", "auron_dieu_khien")
 
     def kiem_file_ma_nguon(self):
         """Báo rõ nếu thư mục ma_nguon thiếu file .py (thường do build cũ / cập nhật dở)."""
@@ -2198,28 +2206,37 @@ class App:
         return lenh
 
     # ====================== CHẠY / DỪNG ======================
-    def bam_chay(self, xem_truoc=False):
+    def bam_chay(self, xem_truoc=False, tu_dong=False):
+        """tu_dong=True (AURON chạy cả thư mục): không hiện hộp thoại; lỗi ghi vào self.auron_loi; trả True nếu đã bắt đầu chạy."""
         if self.dang_chay:
-            return
+            return False
         try:
             lenh = self.lam_lenh(xem_truoc)
         except ValueError as e:
+            if tu_dong:
+                self.auron_loi = str(e)
+                return False
             messagebox.showwarning("Thông báo", str(e))
-            return
+            return False
         thu_muc_ra = os.path.abspath(self.thu_muc_ra.get())
         if lt:
             loi, luu_y = lt.kiem_tra_truoc(self.muc, self.dung_origin.get() and not xem_truoc,
                                            THU_MUC_XEM_TRUOC if xem_truoc else thu_muc_ra, self.loai.get())
             if loi:
+                if tu_dong:
+                    self.auron_loi = "; ".join(loi)
+                    return False
                 messagebox.showerror("Chưa thể chạy", "\n".join("• " + x for x in loi))
-                return
+                return False
             try:
                 import nop_bai_gui
                 luu_y = list(luu_y) + ([] if xem_truoc else nop_bai_gui.kiem_tra_thong_so(self))
             except Exception:
                 pass
-            if luu_y and not messagebox.askyesno("Lưu ý trước khi chạy", "\n".join("• " + x for x in luu_y) + "\n\nVẫn tiếp tục?"):
-                return
+            if luu_y and tu_dong:
+                self.q.put("[LƯU Ý] " + "; ".join(luu_y) + "\n")
+            elif luu_y and not messagebox.askyesno("Lưu ý trước khi chạy", "\n".join("• " + x for x in luu_y) + "\n\nVẫn tiếp tục?"):
+                return False
         self.luu_cai_dat()
         if xem_truoc:
             import shutil
@@ -2237,6 +2254,7 @@ class App:
         self.log.config(state="disabled")
         self.duong_json_chay = None if xem_truoc else self.ghi_thong_so_chay(lenh, thu_muc_ra)
         threading.Thread(target=self.chay_nen, args=(lenh, self.che_do), daemon=True).start()
+        return True
 
     def bam_dung(self):
         if not self.dang_chay or self.che_do not in ("chay", "xem_truoc"):
@@ -2502,6 +2520,11 @@ class App:
                 self.mo_xem_truoc()
             if ket == "thanh_cong" and self.muc:
                 self.danh_gia_auron(m[3] if len(m) > 3 else "")
+            if getattr(self, "dk_auron", None) is not None:
+                self.dk_auron.sau_chay(ket, m[3] if len(m) > 3 else "")
+        elif m[0] == "auron_xong_rieng":
+            if getattr(self, "dk_auron", None) is not None:
+                self.dk_auron.sau_rieng(m[1], m[2], m[3])
         elif m[0] == "xong_cap_nhat":
             _, ok, msg = m
             self.dang_chay = False

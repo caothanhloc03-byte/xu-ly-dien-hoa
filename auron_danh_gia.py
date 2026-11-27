@@ -13,7 +13,7 @@ import threading
 import time
 
 _KHOA = threading.Lock()
-TOI_DA = 20
+TOI_DA = 60
 
 
 def duong_dan_file():
@@ -308,6 +308,9 @@ def tu_xps(kq, mau="", ten=""):
             + ("(trong khoảng 0,85–1,15 thường coi là hợp lý)" if 0.85 <= rs <= 1.15 else "(ngoài 0,85–1,15)") + f", tự tương quan phần dư {f['tu_tuong_quan']:+.2f}."]
     for c in sorted(tp, key=lambda c: -c["pct"]):
         dong.append(f"• {c['ten']}: {c['vt']:.2f} eV, FWHM {c['fwhm']:.2f} eV, {c['pct']:.1f} % diện tích" + (" (chạm biên ràng buộc)" if c["o_bien"] else ""))
+    for g in kq.get("ghi", []):
+        if g.startswith("Có đỉnh phụ"):
+            dong.append("Vùng fit: " + _cat(g, 260))
     dich = kq.get("dich_hieu_chuan")
     if dich is not None and math.isfinite(dich):
         dong.append(f"Dịch hiệu chuẩn đã áp dụng: {dich:+.3f} eV" + (" — lớn (> 1 eV): kiểm tra mẫu có nhiễm điện hoặc chọn nhầm đỉnh chuẩn." if abs(dich) > 1.0 else "."))

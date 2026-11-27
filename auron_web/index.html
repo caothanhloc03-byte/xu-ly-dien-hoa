@@ -576,6 +576,10 @@ document.getElementById('sayForm').addEventListener('submit', async function(ev)
   ev.preventDefault();
   var inp = document.getElementById('sayIn'), q = inp.value.trim(); if (!q || busy) return;
   inp.value = ''; commit(); addMsg('you', q);
+  try {                                    // lệnh làm việc trong thư mục (chọn thư mục, chạy toàn bộ data...): chuyển cho Echem Studio
+    var rl = await fetch('lenh', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cau:q}), cache:'no-store'}), jl = await rl.json();
+    if (jl && jl.nhan){ reply(jl.lenh === 'dung' ? 'neutral' : 'happy', jl.tra_loi); setTimeout(hoiSuKien, 1500); setTimeout(hoiSuKien, 4000); return; }
+  } catch(x){}
   if (!engine){
     if (lastEvent && /kết quả|đánh giá|nhận xét|vừa (rồi|xong)|mẫu nào/i.test(q)){ reply(lastEvent.mood || 'neutral', lastEvent.chi_tiet); return; }
     var ngan = q.length <= 28, r = rules(q, !ngan), tl = (!r && window.TroGiup) ? TroGiup.traLoiNhanh(q) : null;
@@ -660,7 +664,7 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
-var CHAO = 'Xin chào ngài. Tôi là AURON, trợ lý của Echem Studio. Sau khi ngài phân tích hoặc vẽ xong, tôi sẽ nhận xét số liệu ngay tại đây; ngài cũng có thể hỏi tôi cách làm, công thức, tiêu chí và lỗi thường gặp của từng phép đo.';
+var CHAO = 'Xin chào ngài. Tôi là AURON, trợ lý của Echem Studio. Sau khi ngài phân tích hoặc vẽ xong, tôi sẽ nhận xét số liệu ngay tại đây; ngài cũng có thể hỏi tôi cách làm, công thức, tiêu chí và lỗi thường gặp của từng phép đo. Ngài cũng có thể chỉ định một thư mục dữ liệu: tôi nhận diện từng phép đo rồi chạy, vẽ và nhận xét lần lượt.';
 setExpr(idx('neutral'), true, true); typeLine(CHAO);
 function hienSuKien(e){
   commit(); lastEvent = e;
@@ -693,7 +697,7 @@ setInterval(function(){ if (!document.hidden) hoiSuKien(false); }, 2500);
   head.addEventListener('pointerup', function(){ if (drag){ drag = null; luu(); } });
   mn.addEventListener('click', function(){ var m = ctl.classList.toggle('min'); mn.textContent = m ? '▸' : '◂'; luu(); });
 })();
-var GOI_Y = ['Giải thích kết quả vừa rồi', 'Cách xử lý GCD cho siêu tụ lai?', 'Làm sao tính Tafel?', 'Cách tính ECSA từ CV?', 'Lỗi thường gặp khi nạp file?', 'Bản mới có gì?'];
+var GOI_Y = ['📁 Chọn thư mục làm việc', 'Chạy toàn bộ data', 'Giải thích kết quả vừa rồi', 'Cách xử lý GCD cho siêu tụ lai?', 'Làm sao tính Tafel?', 'Cách tính ECSA từ CV?', 'Lỗi thường gặp khi nạp file?', 'Bản mới có gì?'];
 GOI_Y.forEach(function(t){
   var b = document.createElement('button'); b.type = 'button'; b.textContent = t;
   b.addEventListener('click', function(){ document.getElementById('sayIn').value = t; document.getElementById('sayForm').requestSubmit(); });

@@ -109,6 +109,31 @@ class _XuLy(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
+    def do_POST(self):
+        """Trang AURON gửi câu gõ tới /lenh: nếu là LỆNH (chạy dữ liệu, chọn thư mục...) thì chuyển cho app và trả lời ngay; không phải lệnh thì nhan=false."""
+        if self.path.split("?")[0] != "/lenh":
+            self.send_error(404)
+            return
+        try:
+            n = min(int(self.headers.get("Content-Length") or 0), 8192)
+            d = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
+            import auron_thu_muc as at
+            c = at.phan_tich_lenh(str(d.get("cau", "")))
+            ra = {"nhan": False}
+            if c:
+                tl = at.mo_ta_lenh(c)
+                if not (c["lenh"] == "chay" and not (c["tat_ca"] or c["loai"] or c["ten"])):
+                    at.ghi_lenh(c)
+                ra = {"nhan": True, "tra_loi": tl, "lenh": c["lenh"]}
+        except Exception:  # noqa: BLE001
+            ra = {"nhan": False}
+        nd = json.dumps(ra, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", MIME[".json"])
+        self.send_header("Content-Length", str(len(nd)))
+        self.end_headers()
+        self.wfile.write(nd)
+
     def do_GET(self):
         if self.path.split("?")[0] == "/su_kien":                    # nhận xét của AURON về dữ liệu vừa xử lý (app ghi file, trang hỏi định kỳ)
             q = parse_qs(urlparse(self.path).query)

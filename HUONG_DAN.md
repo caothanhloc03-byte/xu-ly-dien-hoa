@@ -643,3 +643,16 @@ Bấm **🤖 Hỏi AURON** (đầu cửa sổ app, hoặc tab Trợ giúp) để
 - **ECSA tương tác:** khi bấm Dùng: Cdl, R², số tốc độ quét, ECSA = Cdl/Cs, cảnh báo Cdl ≤ 0, R² thấp, ít điểm, giao điểm trục tung lớn.
 - **Tafel Qs-LSV:** khi Xuất / Lưu kết quả / Vẽ Origin: b ± sai số, R², số điểm, số decade (< 1 thì nhắc), mẫu có b nhỏ nhất, cảnh báo của công cụ.
 - Ngưỡng ghi "tham khảo" là kiến thức chung, không bắt buộc. Cùng một nhận xét lặp lại liên tiếp chỉ hiện một lần. Lỗi khi nhận xét không bao giờ làm hỏng công cụ.
+
+## v107 - AURON làm việc trực tiếp trong một thư mục
+- **Chỉ định thư mục:** trong cửa sổ AURON bấm ô "📁 Chọn thư mục làm việc" (app mở hộp chọn thư mục) hoặc gõ `mở thư mục D:\Du_lieu`. AURON quét các thư mục con và liệt kê: tên thư mục → loại phép đo → số file.
+- **Nhận diện:** theo tên thư mục (CV, LSV/OER/HER, IT/stability, EIS, ECSA/Cdl, Tafel, GCD, XPS, XRD, HR-TEM), nếu không có thì theo tên thư mục cha, tên file, rồi nội dung file (.vms → XPS, cột 2θ → XRD, hình dạng dữ liệu → CV/LSV/IT/EIS). Nếu tên và nội dung mâu thuẫn (vd thư mục tên LSV nhưng file là CV) thì để app tự nhận dạng từng file và ghi chú rõ.
+- **Ra lệnh:** `chạy toàn bộ data`, `chỉ chạy EIS và GCD`, `chạy thư mục EIS_1`, `chạy bài 2 và 3`, `quét lại`, `tiến độ`, `dừng`. Câu hỏi bình thường (cách tính, hướng dẫn...) vẫn được trả lời như cũ; lệnh "chạy" không nói rõ phạm vi thì AURON hỏi lại, không chạy nhầm.
+- **Chạy lần lượt:** mỗi bài chạy xong mới sang bài sau; bài lỗi được ghi lại và bỏ qua, không dừng cả loạt. CV/LSV/IT/EIS/ECSA/Tafel dùng đúng đường chạy và thông số đang đặt ở cửa sổ chính (pH, Eref, diện tích, bù iR, tick Origin/Matplotlib...); GCD/XPS/XRD chạy không cửa sổ với thiết lập mặc định (GCD cần khối lượng trong tên file dạng 2.32mg hoặc file CS Studio; XPS fit các vùng có mẫu sẵn C1s/O1s/N1s/Ti2p/S2p/Ru3d/Au4f, vùng khác được liệt kê là chưa fit). HR-TEM cần chọn vùng ảnh và thang nm/px nên chỉ được liệt kê.
+- **Kết quả:** `<thư mục>/Ket_qua_AURON/<tên bài>/` (hình, CSV, báo cáo) và `tom_tat_AURON.txt`; dữ liệu gốc không bị sửa. Sau mỗi bài AURON nhận xét số liệu như các phiên bản trước. Xong loạt, bảng file và thông số của cửa sổ chính được trả về như trước khi chạy.
+- Thư mục tên `Ket_qua_AURON`, `csv_va_anh_nhanh`, `_sao_luu`, thư mục bắt đầu bằng `_` hoặc `.` được bỏ qua khi quét.
+
+## v108 - XPS C1s có đỉnh phụ ở năng lượng cao: tự đặt nền ở đáy thung lũng rồi mới fit
+- **Vấn đề:** phổ C1s có đỉnh phụ (π–π*, cacbonat...) ở ~292 eV sát đầu vùng fit mặc định (tới 291 eV) làm điểm neo của nền Shirley rơi lên sườn đỉnh phụ, nền bị nâng lên và fit xấu (Residual STD cao, thành phần O–C=O sai). CasaXPS tránh điều này bằng cách đặt vùng kết thúc ở đáy "thung lũng" giữa đỉnh chính và đỉnh phụ.
+- **Cách làm mới:** sau khi hiệu chuẩn, app tìm thung lũng (cực tiểu cục bộ đầu tiên cách đỉnh chính ≥ 4,3 eV mà sau đó phổ còn nhô lên đỉnh phụ ≥ 4 % chiều cao đỉnh chính, tách ≥ 0,8 eV). Nếu thung lũng nằm trong vùng fit thì vùng fit được cắt tại đó, nền Shirley neo ở đó rồi mới fit; đỉnh phụ nằm ngoài vùng fit. Việc này được ghi trong ô kết quả, báo cáo và nhận xét của AURON (mục "Quyết định về thành phần").
+- Phổ không có đỉnh phụ thì giữ nguyên vùng fit như cũ. Áp dụng cho C1s và Ru3d+C1s. Thử trên phổ giả: Residual STD từ ~2,6 xuống ~1,0.
